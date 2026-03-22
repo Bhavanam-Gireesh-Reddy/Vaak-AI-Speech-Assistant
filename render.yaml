@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: briefly-api
+    name: meetwise-api
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
@@ -8,21 +8,29 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
-      - key: REDIS_URI
-        fromService:
-          type: redis
-          name: briefly-redis
-          property: connectionString
       - key: SARVAM_API_KEY
         sync: false
       - key: GROQ_API_KEY
         sync: false
       - key: MONGO_URI
         sync: false
+      - key: MONGO_DB
+        value: live_transcription
+      - key: MONGO_COL
+        value: sessions
+      - key: MONGO_COL_USERS
+        value: users
+      - key: USE_REDIS
+        value: "true"
+      - key: REDIS_URI
+        fromService:
+          type: redis
+          name: meetwise-redis
+          property: connectionString
       - key: SECRET_KEY
         generateValue: true
 
   - type: redis
-    name: briefly-redis
+    name: meetwise-redis
     plan: free
     ipAllowList: [] # Only allow internal connections
