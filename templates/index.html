@@ -1162,7 +1162,8 @@
       }
 
       // Open WebSocket
-      const wsUrl = `ws://${location.host}/ws/translate`;
+      const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProto}//${location.host}/ws/translate`;
       ws = new WebSocket(wsUrl);
       ws.binaryType = 'arraybuffer';
 

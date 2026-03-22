@@ -65,6 +65,7 @@ except ImportError:
 
 SARVAM_API_KEY     = os.getenv("SARVAM_API_KEY",     "YOUR_SARVAM_API_KEY_HERE")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "YOUR_GROQ_API_KEY_HERE")
+USE_REDIS      = os.getenv("USE_REDIS",      "false").lower() == "true"
 REDIS_URI      = os.getenv("REDIS_URI",      "redis://localhost:6379")
 MONGO_URI      = os.getenv("MONGO_URI",      "mongodb://localhost:27017")
 MONGO_DB       = os.getenv("MONGO_DB",       "live_transcription")
@@ -104,7 +105,7 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"❌ MongoDB connection failed: {e}")
             db_client = None
-    if REDIS_AVAILABLE:
+    if REDIS_AVAILABLE and USE_REDIS:
         try:
             redis_client = redis_async.from_url(REDIS_URI)
             await redis_client.ping()
@@ -112,6 +113,9 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"❌ Redis connection failed: {e}")
             redis_client = None
+    elif REDIS_AVAILABLE:
+        print("ℹ️ Redis skipped (USE_REDIS=false)")
+        redis_client = None
     yield
     if db_client:
         db_client.close()
@@ -1310,4 +1314,4 @@ async def process_sarvam_msg(msg, client_ws, mode, frag_buf, last_frag_t, all_se
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True, log_level="info")
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)), reload=True, log_level="info")
