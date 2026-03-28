@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AI Studio — Sarvam AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="/auth-helper.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080c10;--surface:#0f1620;--surface2:#151f2e;--border:#1e2d40;
+  --accent:#00d4ff;--accent2:#7c3aed;--success:#22c55e;--warn:#f59e0b;--danger:#ef4444;
+  --text:#e2eaf4;--muted:#6b8299;--font-ui:'Syne',sans-serif;--font-mono:'JetBrains Mono',monospace;--radius:14px;
+}
+html,body{min-height:100%;background:var(--bg);color:var(--text);font-family:var(--font-ui);}
+body::before{content:'';position:fixed;inset:0;background:
+radial-gradient(ellipse 60% 45% at 12% 12%,rgba(0,212,255,.05) 0%,transparent 70%),
+radial-gradient(ellipse 50% 40% at 88% 88%,rgba(124,58,237,.06) 0%,transparent 70%);
+pointer-events:none;z-index:0;}
+.page{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:24px;display:flex;flex-direction:column;gap:18px;}
+header{display:flex;align-items:center;justify-content:space-between;gap:14px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.logo{display:flex;align-items:center;gap:12px;}
+.logo-icon{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 0 22px rgba(0,212,255,.22);}
+.logo-text{font-size:18px;font-weight:700;}
+.logo-text span{color:var(--accent);}
+.nav{display:flex;gap:8px;flex-wrap:wrap;}
+.btn-nav,.btn,.btn-sm{
+  background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:9px;cursor:pointer;
+  text-decoration:none;transition:all .2s;
+}
+.btn-nav{font-size:13px;font-weight:600;padding:8px 16px;}
+.btn-nav:hover,.btn-nav.active{border-color:var(--accent);color:var(--accent);}
+.layout{display:grid;grid-template-columns:320px 1fr;gap:18px;min-height:75vh;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);}
+.sidebar{padding:16px;display:flex;flex-direction:column;gap:14px;}
+.label{font-family:var(--font-mono);font-size:11px;color:var(--muted);letter-spacing:.4px;}
+.youtube-box{padding:14px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;gap:10px;}
+.input,.textarea,.select{
+  width:100%;background:#0b1520;color:var(--text);border:1px solid var(--border);border-radius:9px;
+  outline:none;font-family:var(--font-mono);font-size:12px;padding:10px 12px;
+}
+.textarea{min-height:90px;resize:vertical;}
+.input:focus,.textarea:focus,.select:focus{border-color:var(--accent);}
+.btn{font-family:var(--font-ui);font-size:13px;font-weight:700;padding:10px 14px;}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;}
+.btn.secondary{color:var(--accent);border-color:rgba(0,212,255,.35);}
+.btn.warn{color:var(--warn);border-color:rgba(245,158,11,.35);}
+.btn.success{color:var(--success);border-color:rgba(34,197,94,.35);}
+.btn:disabled,.btn-sm:disabled{opacity:.55;cursor:not-allowed;}
+.search{display:flex;gap:8px;}
+.session-list{display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 320px);overflow:auto;padding-right:2px;}
+.session-item{
+  padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface2);cursor:pointer;transition:all .2s;
+}
+.session-item:hover,.session-item.active{border-color:rgba(0,212,255,.4);transform:translateY(-1px);}
+.session-item-title{font-size:13px;font-weight:700;margin-bottom:4px;}
+.session-item-meta{font-family:var(--font-mono);font-size:10px;color:var(--muted);line-height:1.6;}
+.content{padding:18px;display:flex;flex-direction:column;gap:16px;}
+.hero{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;}
+.hero-card,.grid-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;}
+.hero h1{font-size:24px;margin-bottom:8px;}
+.hero p{font-size:13px;color:var(--muted);line-height:1.8;}
+.meta-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.pill{padding:4px 10px;border-radius:20px;border:1px solid var(--border);font-family:var(--font-mono);font-size:10px;color:var(--muted);}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;}
+.stat-card{padding:14px;border-radius:12px;border:1px solid var(--border);background:#0d1420;}
+.stat-val{font-family:var(--font-mono);font-size:26px;font-weight:700;color:var(--accent);}
+.stat-lbl{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:4px;}
+.section-title{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px;font-weight:700;margin-bottom:10px;}
+.grid-two{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.tool-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+.tool-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:260px;}
+.tool-copy{font-size:13px;color:var(--muted);line-height:1.7;}
+.tool-output{
+  flex:1;overflow:auto;background:#0a111a;border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:12px;
+  font-size:13px;line-height:1.75;color:var(--text);white-space:pre-wrap;
+}
+.tool-output.hidden{display:none;}
+.tool-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.btn-sm{font-family:var(--font-mono);font-size:11px;padding:7px 11px;background:transparent;color:var(--text);}
+.flashcard{padding:10px;border:1px solid var(--border);border-radius:10px;background:#0e1622;margin-bottom:10px;}
+.flashcard-q{font-weight:700;font-size:13px;margin-bottom:6px;color:var(--accent);}
+.quiz-q{padding:12px;border:1px solid var(--border);border-radius:10px;background:#0e1622;margin-bottom:10px;}
+.quiz-opt{padding:7px 10px;border-radius:8px;background:#111b2a;border:1px solid rgba(255,255,255,.05);margin-top:6px;font-family:var(--font-mono);font-size:11px;}
+.quiz-opt.answer{border-color:rgba(34,197,94,.45);color:#86efac;}
+.speaker-list,.chat-log,.translation-output,.mindmap-wrap{display:flex;flex-direction:column;gap:10px;}
+.speaker-turn{display:flex;gap:10px;align-items:flex-start;}
+.speaker-label{min-width:90px;padding:4px 8px;border-radius:20px;font-family:var(--font-mono);font-size:10px;background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.3);color:var(--accent);text-align:center;}
+.speaker-text{font-size:13px;line-height:1.7;}
+.sentiment-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#0d1420;}
+.sentiment-tag{font-family:var(--font-mono);font-size:11px;padding:4px 8px;border-radius:20px;border:1px solid;}
+.sentiment-positive{color:#86efac;border-color:rgba(34,197,94,.45);}
+.sentiment-neutral{color:#cbd5e1;border-color:rgba(148,163,184,.45);}
+.sentiment-negative{color:#fca5a5;border-color:rgba(239,68,68,.45);}
+.translation-toolbar,.chat-input-row{display:flex;gap:8px;flex-wrap:wrap;}
+.chat-log{max-height:320px;overflow:auto;padding-right:2px;}
+.chat-msg{padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:#0f1723;font-size:13px;line-height:1.7;}
+.chat-msg.user{border-color:rgba(0,212,255,.3);}
+.chat-msg.assistant{border-color:rgba(124,58,237,.35);}
+.empty{padding:24px;text-align:center;color:var(--muted);font-family:var(--font-mono);font-size:12px;}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface);border:1px solid var(--border);padding:10px 16px;border-radius:10px;font-family:var(--font-mono);font-size:12px;transition:transform .25s;z-index:99;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+.loading{color:var(--muted);font-family:var(--font-mono);font-size:12px;}
+.mindmap-wrap .mermaid{background:#0a111a;border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:12px;overflow:auto;}
+@media (max-width: 980px){
+  .layout,.hero,.grid-two,.tool-grid{grid-template-columns:1fr;}
+  .session-list{max-height:none;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🧠</div>
+      <div class="logo-text">AI <span>Studio</span></div>
+    </div>
+    <div class="nav">
+      <a href="/live" class="btn-nav">🎙 Live</a>
+      <a href="/history" class="btn-nav">📋 History</a>
+      <a href="/dashboard" class="btn-nav">📊 Dashboard</a>
+      <a href="/studio" class="btn-nav active">🧠 Studio</a>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="panel sidebar">
+      <div class="youtube-box">
+        <div class="label">YOUTUBE IMPORT</div>
+        <input class="input" id="youtubeUrl" placeholder="Paste a YouTube URL with captions"/>
+        <button class="btn primary" id="youtubeBtn" onclick="importYouTube()">Import YouTube Transcript</button>
+        <div class="loading" id="youtubeStatus">Captions-based import creates a normal session you can study like any other.</div>
+      </div>
+
+      <div class="label">SEARCH SESSIONS</div>
+      <div class="search">
+        <input class="input" id="sessionSearch" placeholder="Search by title or text" oninput="filterSessions()"/>
+      </div>
+
+      <div class="section-title" style="margin-bottom:0;">
+        <span>Available Sessions</span>
+        <button class="btn-sm" onclick="loadSessions()">↻ Refresh</button>
+      </div>
+      <div class="session-list" id="sessionList">
+        <div class="empty">Loading sessions...</div>
+      </div>
+    </aside>
+
+    <main class="panel content">
+      <div id="emptyStudio" class="empty">Select a session from the left to unlock flashcards, quizzes, podcast generation, transcript chat, mind maps, translations, speakers, and sentiment insights.</div>
+
+      <div id="studioContent" style="display:none;flex-direction:column;gap:16px;">
+        <section class="hero">
+          <div class="hero-card">
+            <div class="label">CURRENT SESSION</div>
+            <h1 id="sessionTitle">Session</h1>
+            <p id="sessionIntro">AI-enhanced session workspace.</p>
+            <div class="meta-row" id="sessionMeta"></div>
+          </div>
+          <div class="hero-card">
+            <div class="section-title"><span>Session Snapshot</span></div>
+            <div class="stat-grid">
+              <div class="stat-card"><div class="stat-val" id="statWords">0</div><div class="stat-lbl">WORDS</div></div>
+              <div class="stat-card"><div class="stat-val" id="statSentences">0</div><div class="stat-lbl">SENTENCES</div></div>
+              <div class="stat-card"><div class="stat-val" id="statSpeakers">0</div><div class="stat-lbl">SPEAKERS</div></div>
+              <div class="stat-card"><div class="stat-val" id="statSentiment">0.00</div><div class="stat-lbl">AVG SENTIMENT</div></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="grid-two">
+          <div class="grid-card">
+            <div class="section-title"><span>Summary & Notes</span></div>
+            <div class="tool-output" id="summaryNotes"></div>
+          </div>
+          <div class="grid-card">
+            <div class="section-title"><span>Speakers & Sentiment</span></div>
+            <div class="speaker-list" id="speakerList"></div>
+            <div style="height:12px"></div>
+            <div id="sentimentSummary"></div>
+          </div>
+        </section>
+
+        <section class="grid-card">
+          <div class="section-title"><span>Multi-language Output</span></div>
+          <div class="translation-toolbar">
+            <select class="select" id="translateLang">
+              <option value="same">Original Language</option>
+              <option value="en">English</option>
+              <option value="hi">Hindi</option>
+              <option value="ta">Tamil</option>
+              <option value="te">Telugu</option>
+              <option value="kn">Kannada</option>
+              <option value="ml">Malayalam</option>
+              <option value="bn">Bengali</option>
+              <option value="mr">Marathi</option>
+              <option value="gu">Gujarati</option>
+              <option value="pa">Punjabi</option>
+              <option value="or">Odia</option>
+              <option value="fr">French</option>
+              <option value="es">Spanish</option>
+              <option value="de">German</option>
+              <option value="ja">Japanese</option>
+              <option value="ar">Arabic</option>
+            </select>
+            <button class="btn secondary" id="translateBtn" onclick="translateCurrent()">Generate Output</button>
+          </div>
+          <div class="tool-output translation-output" id="translationOutput">Choose a language and generate an alternate output.</div>
+        </section>
+
+        <section class="tool-grid">
+          <div class="tool-card">
+            <div class="section-title"><span>Flashcards</span><button class="btn-sm" onclick="generateArtifact('flashcards')">Generate</button></div>
+            <div class="tool-copy">Create quick revision cards straight from the transcript.</div>
+            <div class="tool-output" id="flashcardsOutput">No flashcards yet.</div>
+          </div>
+
+          <div class="tool-card">
+            <div class="section-title"><span>Quiz</span><button class="btn-sm" onclick="generateArtifact('quiz')">Generate</button></div>
+            <div class="tool-copy">Build a transcript-grounded multiple-choice quiz.</div>
+            <div class="tool-output" id="quizOutput">No quiz yet.</div>
+          </div>
+
+          <div class="tool-card">
+            <div class="section-title"><span>AI Podcast</span><div class="tool-actions"><button class="btn-sm" onclick="generateArtifact('podcast')">Generate</button><button class="btn-sm" onclick="playPodcast()">Play</button></div></div>
+            <div class="tool-copy">Turn the session into a short podcast script with browser playback.</div>
+            <div class="tool-output" id="podcastOutput">No podcast script yet.</div>
+          </div>
+
+          <div class="tool-card">
+            <div class="section-title"><span>Mind Map</span><button class="btn-sm" onclick="generateArtifact('mindmap')">Generate</button></div>
+            <div class="tool-copy">Render a study-ready Mermaid mind map from the transcript.</div>
+            <div class="tool-output mindmap-wrap" id="mindmapOutput">No mind map yet.</div>
+          </div>
+        </section>
+
+        <section class="grid-card">
+          <div class="section-title"><span>Chat With Transcript</span></div>
+          <div class="chat-log" id="chatLog">
+            <div class="chat-msg assistant">Ask anything about the selected transcript and I’ll answer from the session context.</div>
+          </div>
+          <div class="chat-input-row" style="margin-top:12px;">
+            <textarea class="textarea" id="chatInput" placeholder="Ask about definitions, topics, takeaways, exam prep, or ask for explanations..." style="min-height:72px;"></textarea>
+            <button class="btn primary" id="chatBtn" onclick="sendChat()">Send</button>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+
+let sessions = [];
+let filteredSessions = [];
+let currentSession = null;
+let chatHistory = [];
+let generatedPodcast = null;
+
+function formatDate(iso) {
+  if (!iso) return 'Unknown date';
+  const d = new Date(iso);
+  return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function escapeHtml(str = '') {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function loadSessions() {
+  try {
+    const res = await fetch('/api/sessions');
+    const data = await res.json();
+    sessions = Array.isArray(data) ? data : [];
+    filteredSessions = sessions.slice();
+    renderSessionList();
+    if (!currentSession && sessions.length) selectSession(sessions[0].session_id);
+  } catch (e) {
+    document.getElementById('sessionList').innerHTML = '<div class="empty">Could not load sessions.</div>';
+  }
+}
+
+function filterSessions() {
+  const q = document.getElementById('sessionSearch').value.trim().toLowerCase();
+  filteredSessions = sessions.filter(s => {
+    const hay = [s.title, s.transcript, s.summary, s.notes, s.source_channel].join(' ').toLowerCase();
+    return !q || hay.includes(q);
+  });
+  renderSessionList();
+}
+
+function renderSessionList() {
+  const list = document.getElementById('sessionList');
+  if (!filteredSessions.length) {
+    list.innerHTML = '<div class="empty">No matching sessions.</div>';
+    return;
+  }
+  list.innerHTML = filteredSessions.map(session => `
+    <div class="session-item ${currentSession && currentSession.session_id === session.session_id ? 'active' : ''}" onclick="selectSession('${session.session_id}')">
+      <div class="session-item-title">${escapeHtml(session.title || 'Untitled Session')}</div>
+      <div class="session-item-meta">
+        ${escapeHtml(formatDate(session.started_at))}<br>
+        ${escapeHtml((session.mode || 'transcribe').toUpperCase())} · ${(session.word_count || 0).toLocaleString()} words
+      </div>
+    </div>
+  `).join('');
+}
+
+async function selectSession(sessionId) {
+  try {
+    const res = await fetch(`/api/sessions/${sessionId}`);
+    const data = await res.json();
+    if (data.error) {
+      showToast(data.error);
+      return;
+    }
+    currentSession = data;
+    chatHistory = [];
+    generatedPodcast = currentSession.podcast || null;
+    renderSessionList();
+    renderSessionWorkspace();
+  } catch (e) {
+    showToast('Could not open that session.');
+  }
+}
+
+function renderSessionWorkspace() {
+  document.getElementById('emptyStudio').style.display = 'none';
+  document.getElementById('studioContent').style.display = 'flex';
+
+  const transcript = currentSession.corrected_transcript || currentSession.filtered_transcript || currentSession.transcript || '';
+  document.getElementById('sessionTitle').textContent = currentSession.title || 'Untitled Session';
+  document.getElementById('sessionIntro').textContent = currentSession.source_type === 'youtube'
+    ? `Imported from YouTube${currentSession.source_channel ? ' · ' + currentSession.source_channel : ''}.`
+    : 'Transcript-derived study workspace for this session.';
+
+  document.getElementById('sessionMeta').innerHTML = [
+    `<span class="pill">${escapeHtml(formatDate(currentSession.started_at))}</span>`,
+    `<span class="pill">${escapeHtml((currentSession.mode || 'transcribe').toUpperCase())}</span>`,
+    `<span class="pill">${escapeHtml(currentSession.language || 'unknown')}</span>`,
+    currentSession.source_type === 'youtube' ? `<span class="pill">YOUTUBE</span>` : '',
+    currentSession.custom_vocabulary && currentSession.custom_vocabulary.length ? `<span class="pill">${currentSession.custom_vocabulary.length} CUSTOM TERMS</span>` : ''
+  ].join('');
+
+  document.getElementById('statWords').textContent = (currentSession.word_count || 0).toLocaleString();
+  document.getElementById('statSentences').textContent = currentSession.sentence_count || 0;
+  document.getElementById('statSpeakers').textContent = (currentSession.speakers || []).length || 0;
+  document.getElementById('statSentiment').textContent = ((currentSession.sentiment_summary || {}).average_score || 0).toFixed(2);
+
+  const summaryText = [
+    currentSession.summary ? `SUMMARY\n${currentSession.summary}` : '',
+    currentSession.notes ? `NOTES\n${currentSession.notes}` : '',
+    transcript ? `TRANSCRIPT PREVIEW\n${transcript.slice(0, 1800)}${transcript.length > 1800 ? '\n\n...' : ''}` : 'No transcript stored.'
+  ].filter(Boolean).join('\n\n');
+  document.getElementById('summaryNotes').textContent = summaryText;
+
+  renderSpeakers();
+  renderSentiment();
+  renderFlashcards(currentSession.flashcards || []);
+  renderQuiz(currentSession.quiz || null);
+  renderPodcast(currentSession.podcast || null);
+  renderMindMap(currentSession.mind_map || null);
+  document.getElementById('translationOutput').textContent = currentSession.translated_en || 'Choose a language and generate an alternate output.';
+  document.getElementById('chatLog').innerHTML = '<div class="chat-msg assistant">Ask anything about the selected transcript and I’ll answer from the session context.</div>';
+  document.getElementById('chatInput').value = '';
+}
+
+function renderSpeakers() {
+  const speakers = currentSession.speakers || [];
+  const speakerList = document.getElementById('speakerList');
+  if (!speakers.length) {
+    speakerList.innerHTML = '<div class="tool-copy">Speaker identification will appear here when detected from the transcript.</div>';
+    return;
+  }
+  speakerList.innerHTML = speakers.slice(0, 10).map(turn => `
+    <div class="speaker-turn">
+      <span class="speaker-label">${escapeHtml(turn.speaker || 'Speaker')}</span>
+      <span class="speaker-text">${escapeHtml(turn.text || '')}</span>
+    </div>
+  `).join('');
+}
+
+function renderSentiment() {
+  const summary = currentSession.sentiment_summary || {};
+  const timeline = currentSession.sentiment_timeline || [];
+  const label = summary.overall || 'neutral';
+  const sentimentBox = document.getElementById('sentimentSummary');
+  sentimentBox.innerHTML = `
+    <div class="sentiment-row">
+      <span>Overall sentiment</span>
+      <span class="sentiment-tag sentiment-${label}">${label.toUpperCase()}</span>
+    </div>
+    <div class="sentiment-row">
+      <span>Positive / Neutral / Negative</span>
+      <span class="label">${(summary.counts || {}).positive || 0} / ${(summary.counts || {}).neutral || 0} / ${(summary.counts || {}).negative || 0}</span>
+    </div>
+    <div class="tool-copy">${timeline.length ? 'Live transcript sentiment was tracked sentence by sentence during capture.' : 'No live sentiment timeline stored for this session yet.'}</div>
+  `;
+}
+
+function renderFlashcards(cards) {
+  const out = document.getElementById('flashcardsOutput');
+  if (!cards || !cards.length) {
+    out.textContent = 'No flashcards yet.';
+    return;
+  }
+  out.innerHTML = cards.map(card => `
+    <div class="flashcard">
+      <div class="flashcard-q">${escapeHtml(card.question || 'Question')}</div>
+      <div><strong>Answer:</strong> ${escapeHtml(card.answer || '')}</div>
+      <div class="tool-copy" style="margin-top:6px;">${escapeHtml(card.explanation || '')}</div>
+    </div>
+  `).join('');
+}
+
+function renderQuiz(quiz) {
+  const out = document.getElementById('quizOutput');
+  if (!quiz || !(quiz.questions || []).length) {
+    out.textContent = 'No quiz yet.';
+    return;
+  }
+  out.innerHTML = `<div style="font-weight:700;margin-bottom:10px;color:var(--accent2);">${escapeHtml(quiz.title || 'Quiz')}</div>` +
+    quiz.questions.map((q, idx) => `
+      <div class="quiz-q">
+        <div style="font-weight:700;margin-bottom:8px;">Q${idx + 1}. ${escapeHtml(q.question || '')}</div>
+        ${(q.options || []).map((opt, optIdx) => `
+          <div class="quiz-opt ${optIdx === q.answer_index ? 'answer' : ''}">
+            ${String.fromCharCode(65 + optIdx)}. ${escapeHtml(opt)}
+          </div>
+        `).join('')}
+        <div class="tool-copy" style="margin-top:8px;">${escapeHtml(q.explanation || '')}</div>
+      </div>
+    `).join('');
+}
+
+function renderPodcast(podcast) {
+  generatedPodcast = podcast || null;
+  const out = document.getElementById('podcastOutput');
+  if (!podcast || !(podcast.script || []).length) {
+    out.textContent = 'No podcast script yet.';
+    return;
+  }
+  out.innerHTML = `<div style="font-weight:700;margin-bottom:10px;color:var(--accent2);">${escapeHtml(podcast.title || 'Podcast')}</div>` +
+    (podcast.hook ? `<div class="tool-copy" style="margin-bottom:10px;">${escapeHtml(podcast.hook)}</div>` : '') +
+    podcast.script.map(line => `<div style="margin-bottom:8px;"><strong>${escapeHtml(line.speaker || 'Host')}:</strong> ${escapeHtml(line.line || '')}</div>`).join('');
+}
+
+async function renderMindMap(mindMap) {
+  const out = document.getElementById('mindmapOutput');
+  if (!mindMap || !mindMap.mermaid) {
+    out.textContent = 'No mind map yet.';
+    return;
+  }
+  const id = 'mindmap-' + Date.now();
+  out.innerHTML = `<div class="mermaid" id="${id}">${mindMap.mermaid}</div>`;
+  try {
+    await mermaid.run({ nodes: [document.getElementById(id)] });
+  } catch (e) {
+    out.innerHTML += `<div class="tool-copy" style="margin-top:10px;">${escapeHtml(mindMap.mermaid)}</div>`;
+  }
+}
+
+async function generateArtifact(kind) {
+  if (!currentSession) return;
+  const outputMap = {
+    flashcards: 'flashcardsOutput',
+    quiz: 'quizOutput',
+    podcast: 'podcastOutput',
+    mindmap: 'mindmapOutput'
+  };
+  const out = document.getElementById(outputMap[kind]);
+  out.textContent = 'Generating...';
+  try {
+    const res = await fetch(`/api/sessions/${currentSession.session_id}/${kind}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Generation failed');
+
+    if (kind === 'flashcards') {
+      currentSession.flashcards = data.flashcards || [];
+      renderFlashcards(currentSession.flashcards);
+    }
+    if (kind === 'quiz') {
+      currentSession.quiz = data.quiz || null;
+      renderQuiz(currentSession.quiz);
+    }
+    if (kind === 'podcast') {
+      currentSession.podcast = data.podcast || null;
+      renderPodcast(currentSession.podcast);
+    }
+    if (kind === 'mindmap') {
+      currentSession.mind_map = data.mind_map || null;
+      await renderMindMap(currentSession.mind_map);
+    }
+    showToast(`${kind} ready`);
+  } catch (e) {
+    out.textContent = e.message;
+    showToast(e.message);
+  }
+}
+
+async function translateCurrent() {
+  if (!currentSession) return;
+  const target = document.getElementById('translateLang').value;
+  const out = document.getElementById('translationOutput');
+  out.textContent = 'Generating translated output...';
+  try {
+    const res = await fetch(`/api/sessions/${currentSession.session_id}/translate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target_lang: target })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Translation failed');
+    currentSession[`translated_${target}`] = data.translated || '';
+    out.textContent = data.translated || 'No translated content returned.';
+    showToast(`Output ready in ${target.toUpperCase()}`);
+  } catch (e) {
+    out.textContent = e.message;
+    showToast(e.message);
+  }
+}
+
+async function sendChat() {
+  if (!currentSession) return;
+  const input = document.getElementById('chatInput');
+  const message = input.value.trim();
+  if (!message) return;
+  const log = document.getElementById('chatLog');
+  const btn = document.getElementById('chatBtn');
+  chatHistory.push({ role: 'user', content: message });
+  log.innerHTML += `<div class="chat-msg user">${escapeHtml(message)}</div>`;
+  input.value = '';
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/sessions/${currentSession.session_id}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, history: chatHistory })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Chat failed');
+    chatHistory.push({ role: 'assistant', content: data.answer || '' });
+    log.innerHTML += `<div class="chat-msg assistant">${escapeHtml(data.answer || '')}</div>`;
+    log.scrollTop = log.scrollHeight;
+  } catch (e) {
+    log.innerHTML += `<div class="chat-msg assistant">${escapeHtml(e.message)}</div>`;
+    showToast(e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function playPodcast() {
+  if (!generatedPodcast || !(generatedPodcast.script || []).length) {
+    showToast('Generate a podcast script first.');
+    return;
+  }
+  if (!('speechSynthesis' in window)) {
+    showToast('Browser speech synthesis is not available.');
+    return;
+  }
+  window.speechSynthesis.cancel();
+  const script = generatedPodcast.script.map(line => `${line.speaker || 'Host'} says. ${line.line || ''}`).join(' ');
+  const utterance = new SpeechSynthesisUtterance(script);
+  utterance.rate = 1;
+  window.speechSynthesis.speak(utterance);
+  showToast('Playing podcast script');
+}
+
+async function importYouTube() {
+  const url = document.getElementById('youtubeUrl').value.trim();
+  const btn = document.getElementById('youtubeBtn');
+  const status = document.getElementById('youtubeStatus');
+  if (!url) {
+    showToast('Paste a YouTube URL first.');
+    return;
+  }
+  btn.disabled = true;
+  status.textContent = 'Importing captions and creating a session...';
+  try {
+    const res = await fetch('/api/youtube/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Import failed');
+    status.textContent = 'Imported successfully. Refreshing sessions...';
+    document.getElementById('youtubeUrl').value = '';
+    await loadSessions();
+    await selectSession(data.session_id);
+    showToast('YouTube session imported');
+  } catch (e) {
+    status.textContent = e.message;
+    showToast(e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+}
+
+document.addEventListener('DOMContentLoaded', loadSessions);
+</script>
+</body>
+</html>

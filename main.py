@@ -63,6 +63,25 @@ except ImportError:
     LLM_AVAILABLE = False
     print("WARNING: llm.py not found or httpx not installed.")
 
+try:
+    from ai_features import (
+        analyze_sentiment_text,
+        apply_custom_vocabulary,
+        build_youtube_session,
+        chat_with_transcript,
+        generate_flashcards,
+        generate_mind_map,
+        generate_podcast_script,
+        generate_quiz,
+        generate_translation,
+        normalize_custom_vocabulary,
+        summarize_sentiment_timeline,
+    )
+    AI_FEATURES_AVAILABLE = True
+except ImportError as e:
+    AI_FEATURES_AVAILABLE = False
+    print(f"WARNING: ai_features unavailable: {e}")
+
 SARVAM_API_KEY     = os.getenv("SARVAM_API_KEY",     "YOUR_SARVAM_API_KEY_HERE")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "YOUR_GROQ_API_KEY_HERE")
 USE_REDIS      = os.getenv("USE_REDIS",      "false").lower() == "true"
@@ -461,6 +480,11 @@ async def dashboard(request: Request):
     return serve_html("dashboard.html")
 
 
+@app.get("/studio", response_class=HTMLResponse)
+async def studio(request: Request):
+    return serve_html("studio.html")
+
+
 @app.post("/api/sessions/{session_id}/translate")
 async def translate_session(session_id: str, body: dict):
     """Translate a saved session transcript to a target language."""
@@ -470,12 +494,15 @@ async def translate_session(session_id: str, body: dict):
     if not doc:
         return JSONResponse({"error": "Session not found"}, status_code=404)
     target_lang = body.get("target_lang", "en")
+    target_lang = body.get("target_lang", "en")
+    if target_lang != "same" and doc.get(f"translated_{target_lang}") and not body.get("regenerate"):
+        return JSONResponse({"translated": doc.get(f"translated_{target_lang}", ""), "target_lang": target_lang, "cached": True})
     text = doc.get("corrected_transcript") or doc.get("filtered_transcript") or doc.get("transcript", "")
     if not text:
         return JSONResponse({"error": "No transcript to translate"}, status_code=400)
     if not LLM_AVAILABLE:
         return JSONResponse({"error": "LLM not available"}, status_code=503)
-    translated = await translate_transcript(text, target_lang)
+    translated = await generate_translation(doc, target_lang) if AI_FEATURES_AVAILABLE else await translate_transcript(text, target_lang)
     if not translated:
         return JSONResponse({"error": "Translation failed"}, status_code=500)
     # Save translated version
@@ -483,7 +510,7 @@ async def translate_session(session_id: str, body: dict):
         {"session_id": session_id},
         {"$set": {f"translated_{target_lang}": translated}}
     )
-    return JSONResponse({"translated": translated, "target_lang": target_lang})
+    return JSONResponse({"translated": translated, "target_lang": target_lang, "cached": False})
 
 
 @app.get("/api/sessions/{session_id}")
@@ -494,6 +521,134 @@ async def get_session(session_id: str):
     if not doc:
         return JSONResponse({"error": "Not found"}, status_code=404)
     return JSONResponse(doc)
+
+
+@app.post("/api/sessions/{session_id}/flashcards")
+async def session_flashcards(session_id: str, body: dict, request: Request, x_api_key: str = Header(default="")):
+    if not AI_FEATURES_AVAILABLE or not LLM_AVAILABLE:
+        return JSONResponse({"error": "AI features are not available"}, status_code=503)
+    result, error = await get_session_for_user(session_id, request, x_api_key)
+    if error:
+        return error
+    doc, user = result
+    if doc.get("flashcards") and not body.get("regenerate"):
+        return JSONResponse({"flashcards": doc["flashcards"], "cached": True})
+    flashcards = await generate_flashcards(doc)
+    await db_collection.update_one({"session_id": session_id, "user_id": user.get("sub", "")}, {"$set": {"flashcards": flashcards}})
+    return JSONResponse({"flashcards": flashcards, "cached": False})
+
+
+@app.post("/api/sessions/{session_id}/quiz")
+async def session_quiz(session_id: str, body: dict, request: Request, x_api_key: str = Header(default="")):
+    if not AI_FEATURES_AVAILABLE or not LLM_AVAILABLE:
+        return JSONResponse({"error": "AI features are not available"}, status_code=503)
+    result, error = await get_session_for_user(session_id, request, x_api_key)
+    if error:
+        return error
+    doc, user = result
+    if doc.get("quiz") and not body.get("regenerate"):
+        return JSONResponse({"quiz": doc["quiz"], "cached": True})
+    quiz = await generate_quiz(doc)
+    await db_collection.update_one({"session_id": session_id, "user_id": user.get("sub", "")}, {"$set": {"quiz": quiz}})
+    return JSONResponse({"quiz": quiz, "cached": False})
+
+
+@app.post("/api/sessions/{session_id}/podcast")
+async def session_podcast(session_id: str, body: dict, request: Request, x_api_key: str = Header(default="")):
+    if not AI_FEATURES_AVAILABLE or not LLM_AVAILABLE:
+        return JSONResponse({"error": "AI features are not available"}, status_code=503)
+    result, error = await get_session_for_user(session_id, request, x_api_key)
+    if error:
+        return error
+    doc, user = result
+    if doc.get("podcast") and not body.get("regenerate"):
+        return JSONResponse({"podcast": doc["podcast"], "cached": True})
+    podcast = await generate_podcast_script(doc)
+    await db_collection.update_one({"session_id": session_id, "user_id": user.get("sub", "")}, {"$set": {"podcast": podcast}})
+    return JSONResponse({"podcast": podcast, "cached": False})
+
+
+@app.post("/api/sessions/{session_id}/mindmap")
+async def session_mindmap(session_id: str, body: dict, request: Request, x_api_key: str = Header(default="")):
+    if not AI_FEATURES_AVAILABLE or not LLM_AVAILABLE:
+        return JSONResponse({"error": "AI features are not available"}, status_code=503)
+    result, error = await get_session_for_user(session_id, request, x_api_key)
+    if error:
+        return error
+    doc, user = result
+    if doc.get("mind_map") and not body.get("regenerate"):
+        return JSONResponse({"mind_map": doc["mind_map"], "cached": True})
+    mind_map = await generate_mind_map(doc)
+    await db_collection.update_one({"session_id": session_id, "user_id": user.get("sub", "")}, {"$set": {"mind_map": mind_map}})
+    return JSONResponse({"mind_map": mind_map, "cached": False})
+
+
+@app.post("/api/sessions/{session_id}/chat")
+async def session_chat(session_id: str, body: dict, request: Request, x_api_key: str = Header(default="")):
+    if not AI_FEATURES_AVAILABLE:
+        return JSONResponse({"error": "AI features are not available"}, status_code=503)
+    result, error = await get_session_for_user(session_id, request, x_api_key)
+    if error:
+        return error
+    doc, _user = result
+    message = (body.get("message") or "").strip()
+    history = body.get("history") or []
+    if not message:
+        return JSONResponse({"error": "Message is required"}, status_code=400)
+    answer = await chat_with_transcript(doc, message, history)
+    return JSONResponse({"answer": answer})
+
+
+@app.post("/api/youtube/import")
+async def youtube_import(body: dict, request: Request, x_api_key: str = Header(default="")):
+    if not AI_FEATURES_AVAILABLE:
+        return JSONResponse({"error": "AI features are not available"}, status_code=503)
+    if db_collection is None:
+        return JSONResponse({"error": "MongoDB not connected"}, status_code=503)
+    user = await get_authenticated_user(request, x_api_key)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+    url = (body.get("url") or "").strip()
+    if not url:
+        return JSONResponse({"error": "YouTube URL is required"}, status_code=400)
+
+    try:
+        yt_data = await build_youtube_session(url)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+    imported = yt_data["imported"]
+    analysis = yt_data["analysis"]
+    session_id = "yt_" + datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+    started_at = datetime.now(timezone.utc)
+    user_id = user.get("sub", "")
+    final_title = await resolve_title(analysis.get("title") or imported.get("title") or "YouTube Import", user_id)
+
+    await save_to_mongo(
+        session_id,
+        started_at,
+        imported.get("language") or "youtube",
+        "youtube",
+        yt_data["sentences"],
+        analysis.get("filtered_transcript", ""),
+        analysis.get("summary", ""),
+        analysis.get("corrected_transcript", imported.get("transcript", "")),
+        final_title,
+        analysis.get("notes", ""),
+        user_id,
+        analysis.get("speakers", []),
+        extra_fields={
+            "source_type": "youtube",
+            "source_url": imported.get("webpage_url", url),
+            "source_channel": imported.get("channel", ""),
+            "thumbnail": imported.get("thumbnail", ""),
+            "description": imported.get("description", ""),
+            "sentiment_timeline": yt_data.get("sentiment_timeline", []),
+            "sentiment_summary": summarize_sentiment_timeline(yt_data.get("sentiment_timeline", [])),
+        },
+    )
+    return JSONResponse({"ok": True, "session_id": session_id, "title": final_title})
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -536,6 +691,32 @@ def build_user_query(request: Request, extra: dict) -> dict:
     return extra
 
 
+async def get_authenticated_user(request: Request, x_api_key: str = ""):
+    user = await require_api_auth(request, x_api_key)
+    if not user:
+        return None
+    if AUTH_AVAILABLE and not user.get("sub"):
+        db_user = await users_col.find_one({"email": user.get("email")}, {"user_id": 1}) if users_col is not None else None
+        if db_user:
+            user["sub"] = db_user.get("user_id", "")
+    return user
+
+
+async def get_session_for_user(session_id: str, request: Request, x_api_key: str = ""):
+    if db_collection is None:
+        return None, JSONResponse({"error": "MongoDB not connected"}, status_code=503)
+    user = await get_authenticated_user(request, x_api_key)
+    if not user:
+        return None, JSONResponse({"error": "Unauthorized"}, status_code=401)
+    query = {"session_id": session_id}
+    if AUTH_AVAILABLE:
+        query["user_id"] = user["sub"]
+    doc = await db_collection.find_one(query, {"_id": 0})
+    if not doc:
+        return None, JSONResponse({"error": "Session not found"}, status_code=404)
+    return (doc, user), None
+
+
 async def resolve_title(raw_title: str, user_id: str = "") -> str:
     """Ensure title is unique — append (2), (3)... if same title exists."""
     if not raw_title or db_collection is None:
@@ -551,7 +732,7 @@ async def resolve_title(raw_title: str, user_id: str = "") -> str:
 
 
 async def save_to_mongo(session_id, started_at, language, mode,
-                        sentences, filtered_transcript="", summary="", corrected_transcript="", title="", notes="", user_id="", speakers=None):
+                        sentences, filtered_transcript="", summary="", corrected_transcript="", title="", notes="", user_id="", speakers=None, extra_fields=None):
     if db_collection is None:
         print("  [DB] Skipped — MongoDB not connected")
         return
@@ -577,6 +758,8 @@ async def save_to_mongo(session_id, started_at, language, mode,
             "user_id":              user_id,
             "sentences":            sentences,
         }
+        if extra_fields:
+            doc.update(extra_fields)
         await db_collection.update_one(
             {"session_id": session_id},
             {"$set": doc},
@@ -1021,6 +1204,8 @@ async def translate_ws(client_ws: WebSocket):
 
     mode          = settings.get("mode", "transcribe")
     language_code = settings.get("language", "hi-IN")
+    target_lang   = settings.get("target_lang", "same")
+    custom_vocabulary = normalize_custom_vocabulary(settings.get("custom_vocabulary", [])) if AI_FEATURES_AVAILABLE else []
 
     if not SARVAM_AVAILABLE:
         await client_ws.send_json({"type": "error", "message": "sarvamai not installed."})
@@ -1035,6 +1220,7 @@ async def translate_ws(client_ws: WebSocket):
     session_id     = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
     started_at     = datetime.now(timezone.utc)
     all_sentences  = []
+    sentiment_timeline = []
     frag_buf       = []
     last_frag_t    = [0.0]
     pcm_buffer     = bytearray()
@@ -1054,8 +1240,17 @@ async def translate_ws(client_ws: WebSocket):
                     sentence = merge_fragments(frag_buf)
                     frag_buf.clear()
                     if sentence:
+                        if AI_FEATURES_AVAILABLE and custom_vocabulary:
+                            sentence = apply_custom_vocabulary(sentence, custom_vocabulary)
                         print(f"  [flush_idle] → '{sentence}'")
                         all_sentences.append(sentence)
+                        if AI_FEATURES_AVAILABLE and sentiment_timeline is not None:
+                            sentiment = {"text": sentence, **analyze_sentiment_text(sentence)}
+                            sentiment_timeline.append(sentiment)
+                            await broadcast_event(session_id, client_ws, {
+                                "type": "sentiment",
+                                "sentiment": sentiment,
+                            })
                         await broadcast_event(session_id, client_ws, {
                             "type": "transcript", "text": sentence, "is_final": True, "mode": mode,
                         })
@@ -1095,7 +1290,7 @@ async def translate_ws(client_ws: WebSocket):
                     async for msg in sarvam_ws:
                         await process_sarvam_msg(
                             msg, client_ws, mode,
-                            frag_buf, last_frag_t, all_sentences, session_id
+                            frag_buf, last_frag_t, all_sentences, session_id, custom_vocabulary, sentiment_timeline
                         )
 
                 await asyncio.gather(sender(), receiver(), flush_idle())
@@ -1175,7 +1370,11 @@ async def translate_ws(client_ws: WebSocket):
     if frag_buf:
         sentence = merge_fragments(frag_buf)
         if sentence:
+            if AI_FEATURES_AVAILABLE and custom_vocabulary:
+                sentence = apply_custom_vocabulary(sentence, custom_vocabulary)
             all_sentences.append(sentence)
+            if AI_FEATURES_AVAILABLE:
+                sentiment_timeline.append({"text": sentence, **analyze_sentiment_text(sentence)})
 
     print(f"[Session] {session_id} ended — {len(all_sentences)} sentences")
 
@@ -1225,6 +1424,12 @@ async def translate_ws(client_ws: WebSocket):
             result.get("notes", ""),
             ws_user_id,
             result.get("speakers", []),
+            extra_fields={
+                "target_lang": target_lang,
+                "custom_vocabulary": custom_vocabulary,
+                "sentiment_timeline": sentiment_timeline,
+                "sentiment_summary": summarize_sentiment_timeline(sentiment_timeline) if AI_FEATURES_AVAILABLE else {},
+            },
         )
 
         # 4. Notify browser: saved
@@ -1242,7 +1447,7 @@ async def translate_ws(client_ws: WebSocket):
         pass
 
 
-async def process_sarvam_msg(msg, client_ws, mode, frag_buf, last_frag_t, all_sentences, session_id=None):
+async def process_sarvam_msg(msg, client_ws, mode, frag_buf, last_frag_t, all_sentences, session_id=None, custom_vocabulary=None, sentiment_timeline=None):
     try:
         if hasattr(msg, 'model_dump'):
             d = msg.model_dump()
@@ -1275,8 +1480,16 @@ async def process_sarvam_msg(msg, client_ws, mode, frag_buf, last_frag_t, all_se
                     sentence = merge_fragments(frag_buf)
                     frag_buf.clear()
                     if sentence:
+                        if AI_FEATURES_AVAILABLE and custom_vocabulary:
+                            sentence = apply_custom_vocabulary(sentence, custom_vocabulary)
                         print(f"  [END_SPEECH] → '{sentence}'")
                         all_sentences.append(sentence)
+                        if AI_FEATURES_AVAILABLE and sentiment_timeline is not None:
+                            sentiment = {"text": sentence, **analyze_sentiment_text(sentence)}
+                            sentiment_timeline.append(sentiment)
+                            sentiment_payload = {"type": "sentiment", "sentiment": sentiment}
+                            if session_id: await broadcast_event(session_id, client_ws, sentiment_payload)
+                            else: await client_ws.send_json(sentiment_payload)
                         payload = {"type": "transcript", "text": sentence, "is_final": True, "mode": mode}
                         if session_id: await broadcast_event(session_id, client_ws, payload)
                         else: await client_ws.send_json(payload)
@@ -1288,6 +1501,8 @@ async def process_sarvam_msg(msg, client_ws, mode, frag_buf, last_frag_t, all_se
             if not text or not str(text).strip():
                 return
             text = str(text).strip()
+            if AI_FEATURES_AVAILABLE and custom_vocabulary:
+                text = apply_custom_vocabulary(text, custom_vocabulary)
             if len(text) <= 2 and text[-1:] not in '.!?।':
                 return
 
@@ -1304,8 +1519,18 @@ async def process_sarvam_msg(msg, client_ws, mode, frag_buf, last_frag_t, all_se
                 sentence = merge_fragments(frag_buf)
                 frag_buf.clear()
                 if sentence:
+                    if AI_FEATURES_AVAILABLE and custom_vocabulary:
+                        sentence = apply_custom_vocabulary(sentence, custom_vocabulary)
                     print(f"  [sentence] → '{sentence}'")
                     all_sentences.append(sentence)
+                    if AI_FEATURES_AVAILABLE and sentiment_timeline is not None:
+                        sentiment = {"text": sentence, **analyze_sentiment_text(sentence)}
+                        sentiment_timeline.append(sentiment)
+                        sentiment_payload = {"type": "sentiment", "sentiment": sentiment}
+                        if session_id:
+                            await broadcast_event(session_id, client_ws, sentiment_payload)
+                        else:
+                            await client_ws.send_json(sentiment_payload)
                     payload_final = {"type": "transcript", "text": sentence, "is_final": True, "mode": mode}
                     if session_id: await broadcast_event(session_id, client_ws, payload_final)
                     else: await client_ws.send_json(payload_final)

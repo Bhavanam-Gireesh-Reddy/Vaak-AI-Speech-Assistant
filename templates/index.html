@@ -651,6 +651,91 @@
       color: var(--text);
     }
 
+    .config-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 14px;
+    }
+
+    .config-card,
+    .sentiment-panel,
+    .translation-panel-live {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .config-card textarea {
+      width: 100%;
+      min-height: 88px;
+      resize: vertical;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 10px 12px;
+      outline: none;
+    }
+
+    .config-card textarea:focus {
+      border-color: var(--accent);
+    }
+
+    .config-help {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      line-height: 1.7;
+      color: var(--muted);
+    }
+
+    .sentiment-row-live {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .sentiment-tag-live {
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      font-size: 10px;
+      letter-spacing: 0.4px;
+    }
+
+    .sentiment-tag-live.positive {
+      color: #4ade80;
+      border-color: rgba(34, 197, 94, 0.45);
+    }
+
+    .sentiment-tag-live.neutral {
+      color: #cbd5e1;
+      border-color: rgba(148, 163, 184, 0.45);
+    }
+
+    .sentiment-tag-live.negative {
+      color: #fca5a5;
+      border-color: rgba(239, 68, 68, 0.45);
+    }
+
+    .translation-body-live {
+      font-size: 13px;
+      line-height: 1.75;
+      color: var(--text);
+      white-space: pre-wrap;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
     /* ── Nav buttons ─────────────────────────────────────── */
     .btn-nav {
       font-family: var(--font-ui);
@@ -910,12 +995,19 @@
       }
 
       .summary-result-panel,
-      .speaker-panel {
+      .speaker-panel,
+      .config-grid,
+      .sentiment-panel,
+      .translation-panel-live {
         padding: 12px;
       }
 
       .wave-canvas {
         height: 36px;
+      }
+
+      .config-grid {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -936,6 +1028,7 @@
       <div style="display:flex;align-items:center;gap:8px;">
         <a href="/live" class="btn-nav active">🎙 Live</a>
         <a href="/history" class="btn-nav">📋 History</a>
+        <a href="/studio" class="btn-nav">🧠 Studio</a>
         <a href="/dashboard" class="btn-nav">📊 Dashboard</a>
       </div>
       <div id="userMenu" style="display:none;align-items:center;gap:10px;">
@@ -980,6 +1073,29 @@
 
         <div class="sep"></div>
 
+        <span class="label">Target Output</span>
+        <select id="targetLangSelect">
+          <option value="same">Original Language</option>
+          <option value="en">English</option>
+          <option value="hi">Hindi</option>
+          <option value="ta">Tamil</option>
+          <option value="te">Telugu</option>
+          <option value="kn">Kannada</option>
+          <option value="ml">Malayalam</option>
+          <option value="bn">Bengali</option>
+          <option value="mr">Marathi</option>
+          <option value="gu">Gujarati</option>
+          <option value="pa">Punjabi</option>
+          <option value="or">Odia</option>
+          <option value="fr">French</option>
+          <option value="es">Spanish</option>
+          <option value="de">German</option>
+          <option value="ja">Japanese</option>
+          <option value="ar">Arabic</option>
+        </select>
+
+        <div class="sep"></div>
+
         <button id="startBtn" class="btn btn-primary" onclick="startTranslation()">
           ▶ Start
         </button>
@@ -1001,6 +1117,37 @@
 
       <!-- Waveform visualizer -->
       <canvas id="waveCanvas" class="wave-canvas" width="800" height="54"></canvas>
+      <div class="config-grid">
+        <div class="config-card">
+          <div class="summary-header">
+            <span>🧩 CUSTOM VOCABULARY</span>
+            <span style="color:var(--muted);">optional</span>
+          </div>
+          <textarea id="vocabInput" placeholder="Example:
+GPU
+lang chain=LangChain
+grok -> Groq"></textarea>
+          <div class="config-help">Enter one term per line. Use `spoken=canonical` or `spoken -> canonical` to normalize technical words and names during transcription.</div>
+        </div>
+        <div class="sentiment-panel" id="sentimentPanel">
+          <div class="summary-header">
+            <span>💓 REAL-TIME SENTIMENT</span>
+            <span id="sentimentMeta" style="color:var(--muted);">Waiting for speech</span>
+          </div>
+          <div class="sentiment-row-live">
+            <span>Current tone</span>
+            <span class="sentiment-tag-live neutral" id="sentimentTag">NEUTRAL</span>
+          </div>
+          <div class="sentiment-row-live">
+            <span>Average score</span>
+            <span id="sentimentAvg" style="color:var(--text);">0.00</span>
+          </div>
+          <div class="sentiment-row-live">
+            <span>Positive / Neutral / Negative</span>
+            <span id="sentimentCounts" style="color:var(--text);">0 / 0 / 0</span>
+          </div>
+        </div>
+      </div>
       <!-- Upload progress -->
       <div id="uploadProgress" style="display:none;margin-top:8px;">
         <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:4px;">
@@ -1045,6 +1192,14 @@
         <span id="speakerCount" style="color:var(--muted);font-size:9px;"></span>
       </div>
       <div id="speakerBody" class="speaker-body"></div>
+    </div>
+
+    <div class="translation-panel-live" id="translationPanelLive" style="display:none;">
+      <div class="summary-header">
+        <span>🌐 MULTI-LANGUAGE OUTPUT</span>
+        <span id="translationMetaLive" style="color:var(--muted);font-size:9px;"></span>
+      </div>
+      <div class="translation-body-live" id="translationBodyLive"></div>
     </div>
 
     <!-- ── Transcript Area ── -->
@@ -1119,15 +1274,20 @@
     let wordCount = 0;
     let transcriptLog = [];   // {time, text, timestamp_ms}
     let userScrolled = false;   // true when user has scrolled up to read history
+    let sentimentHistory = [];
+    let selectedTargetLang = 'same';
 
     // ── WebSocket + Audio ──────────────────────────────────────────────────────
     async function startTranslation() {
       const mode = document.getElementById('modeSelect').value;
       const lang = document.getElementById('langSelect').value;
+      selectedTargetLang = document.getElementById('targetLangSelect').value;
+      const customVocabulary = document.getElementById('vocabInput').value;
 
       setStatus('connecting', 'Connecting…');
       document.getElementById('startBtn').disabled = true;
       userScrolled = false;
+      sentimentHistory = [];
       // Clear analysis panels for the new recording (but keep previous transcript visible)
       document.getElementById('summaryPanel').classList.remove('visible');
       document.getElementById('summaryBody').textContent = 'Waiting for enough content...';
@@ -1138,7 +1298,12 @@
       document.getElementById('speakerPanel').classList.remove('visible');
       document.getElementById('speakerBody').innerHTML = '';
       document.getElementById('processingBar').classList.remove('visible');
+      document.getElementById('processingBar').innerHTML = '<div class="proc-spinner"></div><span id="processingMsg">Analysing transcript with AI...</span>';
+      document.getElementById('translationPanelLive').style.display = 'none';
+      document.getElementById('translationBodyLive').textContent = '';
+      document.getElementById('translationMetaLive').textContent = '';
       window._filteredTranscript = null;
+      resetSentimentPanel();
       // Remove empty state if restoring from storage
       const es = document.getElementById('emptyState');
       if (es && transcriptLog.length > 0) es.remove();
@@ -1170,7 +1335,7 @@
 
       ws.onopen = () => {
         // Send settings as first message
-        ws.send(JSON.stringify({ mode, language: lang, target_lang: 'en-IN' }));
+        ws.send(JSON.stringify({ mode, language: lang, target_lang: selectedTargetLang, custom_vocabulary: customVocabulary }));
       };
 
       ws.onmessage = (ev) => handleMessage(JSON.parse(ev.data));
@@ -1333,6 +1498,9 @@
         case 'saved':
           setStatus('idle', 'Idle');
           document.getElementById('startBtn').disabled = false;
+          if (window._sessionId && selectedTargetLang && selectedTargetLang !== 'same') {
+            generateTranslatedOutput(window._sessionId, selectedTargetLang);
+          }
           showToast(msg.message || '✓ Saved', 'ok');
           break;
 
@@ -1342,6 +1510,10 @@
 
         case 'partial':
           upsertPartial(msg.text);
+          break;
+
+        case 'sentiment':
+          updateSentiment(msg.sentiment || {});
           break;
 
         case 'error':
@@ -1403,6 +1575,8 @@
       window._filteredTranscript = null;
       window._correctedTranscript = null;
       window._sessionTitle = null;
+      document.getElementById('translationPanelLive').style.display = 'none';
+      resetSentimentPanel();
 
       const scroll = document.getElementById('transcriptScroll');
       scroll.innerHTML = '';
@@ -1780,6 +1954,55 @@
       return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    function resetSentimentPanel() {
+      document.getElementById('sentimentTag').textContent = 'NEUTRAL';
+      document.getElementById('sentimentTag').className = 'sentiment-tag-live neutral';
+      document.getElementById('sentimentAvg').textContent = '0.00';
+      document.getElementById('sentimentCounts').textContent = '0 / 0 / 0';
+      document.getElementById('sentimentMeta').textContent = 'Waiting for speech';
+    }
+
+    function updateSentiment(sentiment) {
+      sentimentHistory.push(sentiment);
+      const counts = { positive: 0, neutral: 0, negative: 0 };
+      let total = 0;
+      sentimentHistory.forEach(item => {
+        const label = item.label || 'neutral';
+        counts[label] = (counts[label] || 0) + 1;
+        total += Number(item.score || 0);
+      });
+      const avg = sentimentHistory.length ? total / sentimentHistory.length : 0;
+      const tag = document.getElementById('sentimentTag');
+      const label = sentiment.label || 'neutral';
+      tag.textContent = label.toUpperCase();
+      tag.className = `sentiment-tag-live ${label}`;
+      document.getElementById('sentimentAvg').textContent = avg.toFixed(2);
+      document.getElementById('sentimentCounts').textContent = `${counts.positive || 0} / ${counts.neutral || 0} / ${counts.negative || 0}`;
+      document.getElementById('sentimentMeta').textContent = sentiment.text ? `Latest: ${sentiment.text.slice(0, 64)}${sentiment.text.length > 64 ? '...' : ''}` : 'Updated';
+    }
+
+    async function generateTranslatedOutput(sessionId, targetLang) {
+      const panel = document.getElementById('translationPanelLive');
+      const body = document.getElementById('translationBodyLive');
+      const meta = document.getElementById('translationMetaLive');
+      panel.style.display = 'flex';
+      body.textContent = 'Generating translated output...';
+      meta.textContent = targetLang.toUpperCase();
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/translate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_lang: targetLang })
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'Translation failed');
+        body.textContent = data.translated || '';
+        meta.textContent = `${targetLang.toUpperCase()} output ready`;
+      } catch (e) {
+        body.textContent = e.message;
+      }
+    }
+
     // ── Keyboard shortcut ──────────────────────────────────────────────────────
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.repeat) {
@@ -1842,6 +2065,8 @@
 
       const mode = document.getElementById('modeSelect').value;
       const lang = document.getElementById('langSelect').value;
+      const targetLang = document.getElementById('targetLangSelect').value;
+      const customVocabulary = document.getElementById('vocabInput').value;
 
       setStatus('connecting', 'Processing file…');
       transcriptLog = [];
@@ -1868,7 +2093,7 @@
 
         ws.onopen = async () => {
           setStatus('recording', 'Transcribing file…');
-          ws.send(JSON.stringify({ action: 'start', language: lang, mode }));
+          ws.send(JSON.stringify({ action: 'start', language: lang, mode, target_lang: targetLang, custom_vocabulary: customVocabulary }));
           const CHUNK = 8000, total = pcmData.length;
           for (let i = 0; i < total; i += CHUNK) {
             if (!ws || ws.readyState !== WebSocket.OPEN) break;

@@ -7,6 +7,11 @@ Enterprise-grade real-time speech transcription, translation, and intelligent se
 - ✅ **11 Indian languages** — translate to English, transcribe, code-mix, or verbatim modes
 - ✅ **Smart session analysis** — automatic keyword extraction, transcript filtering, and title generation via Groq AI
 - ✅ **AI Study Notes & Exports** — auto-generates structured notes and allows one-click export to PDF, DOC, and TXT.
+- ✅ **AI Studio** — generate flashcards, quizzes, podcast scripts, mind maps, translations, and grounded transcript chat
+- ✅ **YouTube Transcript Import** — pull captioned YouTube videos into the same study workflow
+- ✅ **Speaker identification** — inferred multi-speaker turns shown in live analysis and saved sessions
+- ✅ **Real-time sentiment analysis** — live tone tracking across captured transcript segments
+- ✅ **Custom vocabulary support** — bias and normalize terminology with per-session word mappings
 - ✅ **Distributed Scalability** — built-in Redis Pub/Sub for syncing WebSockets across multiple server workers.
 - ✅ **User authentication** — JWT-based auth + API key management
 - ✅ **Session persistence** — store transcripts, translations, and metadata in MongoDB
@@ -381,11 +386,18 @@ For issues, suggestions, or contributions:
 ## Roadmap
 
 - [ ] Multi-language output (not just English)
-- [ ] Voice profiles (speaker identification)
+- [x] Multi-language output (not just English)
+- [x] Voice profiles (speaker identification)
 - [ ] Conversation threading (multi-speaker support)
-- [ ] Real-time sentiment analysis
-- [ ] Custom vocabulary/terminology support
+- [x] Real-time sentiment analysis
+- [x] Custom vocabulary/terminology support
 - [x] Export to PDF/DOC/TXT
+- [x] Flashcards
+- [x] Quizzes
+- [x] AI Podcast generation
+- [x] Chat with your transcript
+- [x] Mind Maps
+- [x] YouTube video import
 - [ ] Mobile app (React Native)
 - [ ] Docker containerization
 
