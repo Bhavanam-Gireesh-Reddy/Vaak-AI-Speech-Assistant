@@ -592,11 +592,15 @@ async def session_chat(session_id: str, body: dict, request: Request, x_api_key:
         return error
     doc, _user = result
     message = (body.get("message") or "").strip()
-    history = body.get("history") or []
+    history = body.get("history") or doc.get("chat_history") or []
     if not message:
         return JSONResponse({"error": "Message is required"}, status_code=400)
     answer = await chat_with_transcript(doc, message, history)
-    return JSONResponse({"answer": answer})
+    
+    new_history = history + [{"role": "user", "content": message}, {"role": "assistant", "content": answer}]
+    await db_collection.update_one({"session_id": session_id, "user_id": _user.get("sub", "")}, {"$set": {"chat_history": new_history}})
+    
+    return JSONResponse({"answer": answer, "chat_history": new_history})
 
 
 @app.post("/api/youtube/import")
@@ -769,6 +773,8 @@ async def save_to_mongo(session_id, started_at, language, mode,
         # Fire webhook asynchronously
         if user_id:
             asyncio.create_task(fire_webhook(user_id, doc))
+        # Trigger background auto-generation of extended features
+        asyncio.create_task(generate_extended_features_bg_task(session_id, user_id))
     except Exception as e:
         print(f"  [DB] ❌ Save error: {e}")
 
@@ -889,6 +895,36 @@ async def fire_webhook(user_id: str, session_doc: dict):
         print(f"  [Webhook] ✅ Fired → {url}")
     except Exception as e:
         print(f"  [Webhook] ❌ Failed → {url}: {e}")
+
+async def generate_extended_features_bg_task(session_id: str, user_id: str):
+    """Generate all AI features in the background and save to MongoDB."""
+    if db_collection is None or not AI_FEATURES_AVAILABLE:
+        return
+    query = {"session_id": session_id}
+    if user_id: query["user_id"] = user_id
+    doc = await db_collection.find_one(query, {"_id": 0})
+    if not doc:
+        return
+
+    print(f"  [Auto-Gen] Starting background feature generation for {session_id}...")
+    
+    # Run them concurrently to save time, Groq can handle multiple requests
+    flashcards_task = generate_flashcards(doc)
+    quiz_task = generate_quiz(doc)
+    podcast_task = generate_podcast_script(doc)
+    mind_map_task = generate_mind_map(doc)
+    
+    results = await asyncio.gather(flashcards_task, quiz_task, podcast_task, mind_map_task, return_exceptions=True)
+    
+    updates = {}
+    if not isinstance(results[0], Exception) and results[0]: updates["flashcards"] = results[0]
+    if not isinstance(results[1], Exception) and results[1]: updates["quiz"] = results[1]
+    if not isinstance(results[2], Exception) and results[2]: updates["podcast"] = results[2]
+    if not isinstance(results[3], Exception) and results[3]: updates["mind_map"] = results[3]
+    
+    if updates:
+        await db_collection.update_one(query, {"$set": updates})
+        print(f"  [Auto-Gen] ✅ Saved {list(updates.keys())} for {session_id}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

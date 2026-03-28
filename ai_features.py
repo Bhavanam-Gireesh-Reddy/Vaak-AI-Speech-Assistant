@@ -207,12 +207,18 @@ async def _generate_json(prompt: str, system: str, fallback: Any) -> Any:
         cleaned = re.sub(r"```$", "", cleaned).strip()
 
     try:
-        return json.loads(cleaned)
+        sanitized = re.sub(r'(?<!\\)\n', '\\n', cleaned)
+        sanitized = re.sub(r'(?<!\\)\r', '',   sanitized)
+        sanitized = re.sub(r'(?<!\\)\t', '\\t', sanitized)
+        return json.loads(sanitized)
     except Exception:
         match = re.search(r"(\{.*\}|\[.*\])", cleaned, re.DOTALL)
         if match:
             try:
-                return json.loads(match.group(1))
+                sanitized_match = re.sub(r'(?<!\\)\n', '\\n', match.group(1))
+                sanitized_match = re.sub(r'(?<!\\)\r', '',   sanitized_match)
+                sanitized_match = re.sub(r'(?<!\\)\t', '\\t', sanitized_match)
+                return json.loads(sanitized_match)
             except Exception:
                 return fallback
         return fallback
@@ -373,18 +379,64 @@ def import_youtube_transcript(url: str) -> dict[str, Any]:
             raise RuntimeError("Missing YouTube video id.")
 
         subtitle_files = sorted(Path(temp_dir).glob(f"{video_id}*.vtt"))
-        if not subtitle_files:
-            raise RuntimeError("No captions or automatic subtitles were available for this YouTube video.")
-
+        
         transcript_text = ""
         picked_language = ""
-        for file_path in subtitle_files:
-            text = _parse_vtt_to_text(file_path.read_text(encoding="utf-8", errors="ignore"))
-            if text:
-                transcript_text = text
-                suffix = file_path.stem.replace(video_id, "").strip(".")
-                picked_language = suffix or "unknown"
-                break
+
+        if not subtitle_files:
+            # Fallback: transcribe audio using Groq Whisper API
+            ydl_opts_audio = {
+                "quiet": True,
+                "format": "m4a/bestaudio/best",
+                "outtmpl": str(Path(temp_dir) / f"{video_id}_audio.%(ext)s"),
+                "noplaylist": True,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl_audio:
+                try:
+                    ydl_audio.extract_info(url, download=True)
+                except Exception as e:
+                    raise RuntimeError(f"No captions available and failed to download audio for transcription: {e}")
+
+            audio_files = list(Path(temp_dir).glob(f"{video_id}_audio.*"))
+            if not audio_files:
+                raise RuntimeError("No captions available and failed to generate audio file for transcription.")
+            audio_file = audio_files[0]
+
+            import httpx
+            import os
+            sarvam_api_key = os.getenv("SARVAM_API_KEY", "")
+            if not sarvam_api_key or sarvam_api_key == "YOUR_SARVAM_API_KEY_HERE":
+                raise RuntimeError("No captions available. SARVAM_API_KEY is required for fallback audio transcription.")
+            
+            with open(audio_file, "rb") as f:
+                res = httpx.post(
+                    "https://api.sarvam.ai/speech-to-text",
+                    headers={"api-subscription-key": sarvam_api_key},
+                    data={"model": "saaras:v1"},
+                    files={"file": (audio_file.name, f)},
+                    timeout=300.0
+                )
+            if res.status_code == 413:
+                raise RuntimeError("The video is too long (file too large) for fallback audio transcription.")
+            
+            if res.status_code != 200:
+                raise RuntimeError(f"Sarvam API error {res.status_code}: {res.text}")
+                
+            res.raise_for_status()
+            
+            transcript_text = res.json().get("transcript", "").strip()
+            picked_language = res.json().get("language_code", "audio_fallback")
+            
+            if not transcript_text:
+                raise RuntimeError("Fallback audio transcription returned empty text.")
+        else:
+            for file_path in subtitle_files:
+                text = _parse_vtt_to_text(file_path.read_text(encoding="utf-8", errors="ignore"))
+                if text:
+                    transcript_text = text
+                    suffix = file_path.stem.replace(video_id, "").strip(".")
+                    picked_language = suffix or "unknown"
+                    break
 
         if not transcript_text:
             raise RuntimeError("Captions were found but the transcript could not be parsed.")
