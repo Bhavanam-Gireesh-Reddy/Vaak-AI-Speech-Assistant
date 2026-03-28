@@ -230,7 +230,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:14px;pa
           </div>
 
           <div class="tool-card">
-            <div class="section-title"><span>Mind Map</span><button class="btn-sm" onclick="generateArtifact('mindmap')">Generate</button></div>
+            <div class="section-title"><span>Mind Map</span><div class="tool-actions"><button class="btn-sm" onclick="generateArtifact('mindmap')">Generate</button><button class="btn-sm" onclick="downloadMindMap()">Download</button></div></div>
             <div class="tool-copy">Render a study-ready Mermaid mind map from the transcript.</div>
             <div class="tool-output mindmap-wrap" id="mindmapOutput">No mind map yet.</div>
           </div>
@@ -462,6 +462,42 @@ async function renderMindMap(mindMap) {
     await mermaid.run({ nodes: [document.getElementById(id)] });
   } catch (e) {
     out.innerHTML += `<div class="tool-copy" style="margin-top:10px;">${escapeHtml(mindMap.mermaid)}</div>`;
+  }
+}
+
+function downloadMindMap() {
+  if (!currentSession || !currentSession.mind_map || !currentSession.mind_map.mermaid) {
+    showToast('Generate a mind map first.');
+    return;
+  }
+  
+  const svgEl = document.querySelector('#mindmapOutput svg');
+  if (svgEl) {
+    let svgData = new XMLSerializer().serializeToString(svgEl);
+    if (!svgData.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
+      svgData = svgData.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+    }
+    const blob = new Blob([svgData], {type: "image/svg+xml;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = (currentSession.title || 'mindmap').replace(/[^a-z0-9]/gi, '_') + ".svg";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } else {
+    // Fallback: download the plain text mermaid code if SVG hasn't rendered
+    const textData = currentSession.mind_map.mermaid;
+    const blob = new Blob([textData], {type: "text/plain;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = (currentSession.title || 'mindmap').replace(/[^a-z0-9]/gi, '_') + ".mmd";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 }
 

@@ -364,12 +364,16 @@ def import_youtube_transcript(url: str) -> dict[str, Any]:
             "subtitlesformat": "vtt",
             "outtmpl": output_template,
             "noplaylist": True,
+            "extractor_args": {"youtube": {"player_client": ["ios", "default"]}}
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
+            try:
+                info = ydl.extract_info(url, download=True)
+            except Exception as e:
+                raise RuntimeError(f"YouTube block detected or metadata fetch failed: {e}")
 
         if not info:
-            raise RuntimeError("Could not fetch YouTube metadata.")
+            raise RuntimeError("Could not fetch YouTube metadata. Video might be restricted.")
 
         video_id = info.get("id")
         if not video_id:
@@ -387,12 +391,13 @@ def import_youtube_transcript(url: str) -> dict[str, Any]:
                 "format": "m4a/bestaudio/best",
                 "outtmpl": str(Path(temp_dir) / f"{video_id}_audio.%(ext)s"),
                 "noplaylist": True,
+                "extractor_args": {"youtube": {"player_client": ["ios", "default"]}}
             }
             with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl_audio:
                 try:
                     ydl_audio.extract_info(url, download=True)
                 except Exception as e:
-                    raise RuntimeError(f"No captions available and failed to download audio for transcription: {e}")
+                    raise RuntimeError(f"No captions available and failed to download audio for transcription due to block: {e}")
 
             audio_files = list(Path(temp_dir).glob(f"{video_id}_audio.*"))
             if not audio_files:
