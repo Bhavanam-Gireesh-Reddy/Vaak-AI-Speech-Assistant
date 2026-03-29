@@ -559,10 +559,16 @@ async def translate_session(session_id: str, body: dict, request: Request):
 
 
 @app.get("/api/sessions/{session_id}")
-async def get_session(session_id: str):
+async def get_session(session_id: str, request: Request):
     if db_collection is None:
         return JSONResponse({"error": "MongoDB not connected"}, status_code=503)
-    doc = await db_collection.find_one({"session_id": session_id}, {"_id": 0})
+    query = {"session_id": session_id}
+    if AUTH_AVAILABLE:
+        user = get_current_user(request)
+        if not user:
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+        query["user_id"] = user["sub"]
+    doc = await db_collection.find_one(query, {"_id": 0})
     if not doc:
         return JSONResponse({"error": "Not found"}, status_code=404)
     return JSONResponse(doc)
