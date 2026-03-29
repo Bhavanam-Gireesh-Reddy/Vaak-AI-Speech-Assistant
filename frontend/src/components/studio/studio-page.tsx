@@ -47,6 +47,11 @@ type ChatMessage = {
   content: string;
 };
 
+type MindMapNode = {
+  text?: string;
+  children?: MindMapNode[];
+};
+
 type SessionDetail = SessionItem & {
   language?: string;
   corrected_transcript?: string;
@@ -76,7 +81,7 @@ type SessionDetail = SessionItem & {
     hook?: string;
     script?: Array<{ speaker?: string; line?: string }>;
   } | null;
-  mind_map?: { mermaid?: string } | null;
+  mind_map?: { title?: string; mermaid?: string; outline?: MindMapNode[] } | null;
   rich_notes?: string | null;
   chat_history?: ChatMessage[];
   [key: string]: unknown;
@@ -187,6 +192,92 @@ function ActionButton({
       {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
       {children}
     </button>
+  );
+}
+
+function MindMapPreview({
+  title,
+  mermaid,
+  outline,
+}: {
+  title: string;
+  mermaid?: string;
+  outline?: MindMapNode[];
+}) {
+  if (!outline?.length) {
+    return (
+      <pre className="min-h-[260px] whitespace-pre-wrap break-words rounded-3xl border border-slate-200 bg-slate-50 p-5 font-mono text-sm leading-7 text-slate-700">
+        {mermaid || "No mind map generated yet."}
+      </pre>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex justify-center">
+        <div className="max-w-full rounded-full bg-slate-950 px-6 py-3 text-center text-sm font-semibold text-white shadow-sm">
+          {title}
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        {outline.map((node, index) => (
+          <div
+            key={`${node.text ?? "branch"}-${index}`}
+            className="rounded-[28px] border border-slate-200 bg-slate-50 p-5"
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
+              Branch {index + 1}
+            </p>
+            <h4 className="mt-3 text-lg font-semibold text-slate-950">
+              {node.text || "Untitled branch"}
+            </h4>
+
+            {node.children?.length ? (
+              <div className="mt-4 space-y-3">
+                {node.children.map((child, childIndex) => (
+                  <div
+                    key={`${child.text ?? "child"}-${childIndex}`}
+                    className="rounded-2xl border border-white bg-white/85 p-4"
+                  >
+                    <p className="text-sm font-semibold leading-6 text-slate-900">
+                      {child.text || "Supporting point"}
+                    </p>
+                    {child.children?.length ? (
+                      <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                        {child.children.map((leaf, leafIndex) => (
+                          <li
+                            key={`${leaf.text ?? "leaf"}-${leafIndex}`}
+                            className="rounded-2xl bg-slate-50 px-3 py-2"
+                          >
+                            {leaf.text || "Detail"}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm leading-6 text-slate-500">
+                Add more detail by regenerating the mind map for this session.
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {mermaid ? (
+        <details className="rounded-3xl border border-slate-200 bg-white p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-700">
+            Mermaid source
+          </summary>
+          <pre className="mt-4 whitespace-pre-wrap break-words rounded-2xl border border-slate-200 bg-slate-50 p-4 font-mono text-xs leading-6 text-slate-600">
+            {mermaid}
+          </pre>
+        </details>
+      ) : null}
+    </div>
   );
 }
 
@@ -787,7 +878,7 @@ export function StudioPageClient() {
                   {translationValue || 'Choose a language and click "Generate".'}
                 </pre>
               </StudioCard>
-              <section className="grid items-stretch gap-5 2xl:grid-cols-2">
+              <section className="grid items-stretch gap-5 xl:grid-cols-2">
                 <StudioCard
                   bodyClassName="h-full"
                   className="h-full"
@@ -904,8 +995,8 @@ export function StudioPageClient() {
                 <StudioCard
                   bodyClassName="h-full"
                   className="h-full"
-                  title="Podcast and mind map"
-                  subtitle="Generate spoken recap scripts and downloadable mind-map source."
+                  title="Podcast"
+                  subtitle="Generate a compact spoken recap from the selected transcript."
                   actions={
                     <div className="flex flex-wrap gap-3">
                       <ActionButton
@@ -913,31 +1004,18 @@ export function StudioPageClient() {
                         onClick={() => void generateArtifact("podcast")}
                       >
                         <Mic2 className="h-4 w-4" />
-                        Podcast
+                        Generate
                       </ActionButton>
-                      <ActionButton
-                        busy={busyKey === "mindmap"}
-                        onClick={() => void generateArtifact("mindmap")}
-                      >
-                        <Network className="h-4 w-4" />
-                        Mind map
+                      <ActionButton onClick={playPodcast}>
+                        <PlayCircle className="h-4 w-4" />
+                        Play script
                       </ActionButton>
                     </div>
                   }
                 >
                   <div className="flex h-full flex-col gap-4">
                     <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                      <div className="flex flex-wrap gap-3">
-                        <ActionButton onClick={playPodcast}>
-                          <PlayCircle className="h-4 w-4" />
-                          Play script
-                        </ActionButton>
-                        <ActionButton onClick={downloadMindMap}>
-                          <Download className="h-4 w-4" />
-                          Download map
-                        </ActionButton>
-                      </div>
-                      <div className="mt-4 space-y-3">
+                      <div className="space-y-3">
                         {detail.podcast?.script?.length ? (
                           detail.podcast.script.slice(0, 4).map((line, index) => (
                             <div
@@ -957,13 +1035,35 @@ export function StudioPageClient() {
                         )}
                       </div>
                     </div>
-                    <pre className="min-h-[180px] whitespace-pre-wrap break-words rounded-3xl border border-slate-200 bg-slate-50 p-5 font-mono text-sm leading-7 text-slate-700">
-                      {detail.mind_map?.mermaid ||
-                        "No mind map generated yet. Mermaid source will appear here."}
-                    </pre>
                   </div>
                 </StudioCard>
               </section>
+
+              <StudioCard
+                title="Mind map"
+                subtitle="Generate a structured visual map of the session so the main branches and supporting ideas are easier to scan."
+                actions={
+                  <div className="flex flex-wrap gap-3">
+                    <ActionButton
+                      busy={busyKey === "mindmap"}
+                      onClick={() => void generateArtifact("mindmap")}
+                    >
+                      <Network className="h-4 w-4" />
+                      Generate
+                    </ActionButton>
+                    <ActionButton onClick={downloadMindMap}>
+                      <Download className="h-4 w-4" />
+                      Download map
+                    </ActionButton>
+                  </div>
+                }
+              >
+                <MindMapPreview
+                  mermaid={detail.mind_map?.mermaid}
+                  outline={detail.mind_map?.outline}
+                  title={detail.mind_map?.title || detail.title || "Mind Map"}
+                />
+              </StudioCard>
 
               <StudioCard
                 bodyClassName="h-full"

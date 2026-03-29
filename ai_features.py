@@ -270,28 +270,171 @@ async def generate_podcast_script(session_doc: dict[str, Any]) -> dict[str, Any]
     return data
 
 
+def _clean_mind_map_label(value: Any) -> str:
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    text = re.sub(r"[`\"]", "", text)
+    text = text.strip("-:> ")
+    return text[:120]
+
+
+def _normalize_mind_map_outline(raw_items: Any, depth: int = 0) -> list[dict[str, Any]]:
+    if depth > 2 or not isinstance(raw_items, list):
+        return []
+
+    normalized: list[dict[str, Any]] = []
+    for item in raw_items:
+        text = ""
+        children_raw: Any = []
+
+        if isinstance(item, str):
+            text = item
+        elif isinstance(item, dict):
+            text = (
+                item.get("text")
+                or item.get("title")
+                or item.get("label")
+                or item.get("name")
+                or ""
+            )
+            for key in ("children", "items", "nodes", "subtopics"):
+                if isinstance(item.get(key), list):
+                    children_raw = item.get(key)
+                    break
+        else:
+            continue
+
+        cleaned_text = _clean_mind_map_label(text)
+        if not cleaned_text:
+            continue
+
+        normalized.append(
+            {
+                "text": cleaned_text,
+                "children": _normalize_mind_map_outline(children_raw, depth + 1),
+            }
+        )
+
+        if len(normalized) >= (6 if depth == 0 else 4):
+            break
+
+    return normalized
+
+
+def _strip_mermaid_markup(line: str) -> str:
+    cleaned = line.strip()
+    cleaned = re.sub(r"^[A-Za-z0-9_]+\(\((.*)\)\)$", r"\1", cleaned)
+    cleaned = re.sub(r"^[A-Za-z0-9_]+\[(.*)\]$", r"\1", cleaned)
+    cleaned = re.sub(r"^[A-Za-z0-9_]+\{(.*)\}$", r"\1", cleaned)
+    cleaned = re.sub(r"^[A-Za-z0-9_]+$", "", cleaned) or cleaned
+    return _clean_mind_map_label(cleaned)
+
+
+def _outline_from_mermaid_text(raw_mermaid: str) -> list[dict[str, Any]]:
+    cleaned = re.sub(r"(?i)^mermaid(?: version [^\n]+)?\n?", "", raw_mermaid or "").strip()
+    cleaned = re.sub(r"(?i)^```(mermaid)?\n?", "", cleaned).strip()
+    cleaned = re.sub(r"\n?```$", "", cleaned).strip()
+    lines = [line.rstrip() for line in cleaned.splitlines() if line.strip()]
+    if lines and lines[0].strip().lower() == "mindmap":
+        lines = lines[1:]
+
+    root: list[dict[str, Any]] = []
+    stack: list[tuple[int, dict[str, Any]]] = []
+
+    for raw_line in lines:
+        indent = len(raw_line) - len(raw_line.lstrip(" "))
+        level = max(indent // 2, 0)
+        label = _strip_mermaid_markup(raw_line)
+        if not label:
+            continue
+
+        node = {"text": label, "children": []}
+        while stack and stack[-1][0] >= level:
+            stack.pop()
+
+        if not stack:
+            root.append(node)
+        else:
+            stack[-1][1]["children"].append(node)
+        stack.append((level, node))
+
+    if root and root[0]["text"].lower() in {"root", "mindmap"}:
+        root = root[0]["children"]
+
+    return _normalize_mind_map_outline(root)
+
+
+def _fallback_outline_from_context(session_doc: dict[str, Any]) -> list[dict[str, Any]]:
+    source = (
+        session_doc.get("summary")
+        or session_doc.get("notes")
+        or session_doc.get("corrected_transcript")
+        or session_doc.get("transcript")
+        or ""
+    )
+    nodes: list[dict[str, Any]] = []
+    for sentence in transcript_to_sentences(source)[:5]:
+        cleaned = _clean_mind_map_label(sentence)
+        if cleaned:
+            nodes.append({"text": cleaned, "children": []})
+    return nodes
+
+
+def _build_mermaid_mind_map(title: str, outline: list[dict[str, Any]]) -> str:
+    root_title = _clean_mind_map_label(title) or "Mind Map"
+    lines = ["mindmap", f"  root(({root_title}))"]
+
+    def append_nodes(nodes: list[dict[str, Any]], depth: int) -> None:
+        indent = "  " * (depth + 1)
+        for node in nodes:
+            label = _clean_mind_map_label(node.get("text"))
+            if not label:
+                continue
+            lines.append(f"{indent}{label}")
+            children = node.get("children")
+            if isinstance(children, list) and children:
+                append_nodes(children, depth + 1)
+
+    append_nodes(outline, 1)
+    return "\n".join(lines)
+
+
 async def generate_mind_map(session_doc: dict[str, Any]) -> dict[str, Any]:
-    fallback = {"title": session_doc.get("title", "Mind Map"), "mermaid": "", "outline": []}
+    fallback_title = _clean_mind_map_label(session_doc.get("title", "Mind Map")) or "Mind Map"
+    fallback_outline = _fallback_outline_from_context(session_doc)
+    fallback = {
+        "title": fallback_title,
+        "mermaid": _build_mermaid_mind_map(fallback_title, fallback_outline),
+        "outline": fallback_outline,
+    }
     system = (
-        "You create Mermaid mind maps from transcripts. "
+        "You create high-quality study mind maps from transcripts. "
         "Return valid JSON only with keys title, mermaid, outline. "
+        "outline must be an array of 4 to 7 main topic objects with keys text and children. "
+        "children must be short supporting points, with a maximum depth of 3 total levels. "
         "The mermaid value must be a valid Mermaid mindmap block without code fences."
     )
     prompt = (
-        "Create a study mind map from this transcript context.\n\n"
+        "Create a study mind map from this transcript context.\n"
+        "Use short, meaningful branch labels. Avoid dumping full paragraphs into nodes.\n"
+        "Keep the structure clean and hierarchical with a small number of strong branches.\n\n"
         f"{build_transcript_context(session_doc)}"
     )
     data = await _generate_json(prompt, system, fallback)
     if not isinstance(data, dict):
         return fallback
-    mermaid_str = str(data.get("mermaid") or "").strip()
-    mermaid_str = re.sub(r"(?i)^mermaid(?: version [^\n]+)?\n?", "", mermaid_str).strip()
-    mermaid_str = re.sub(r"(?i)^```(mermaid)?\n?", "", mermaid_str).strip()
-    mermaid_str = re.sub(r"\n?```$", "", mermaid_str).strip()
-    data["mermaid"] = mermaid_str
-    if not isinstance(data.get("outline"), list):
-        data["outline"] = []
-    return data
+
+    title = _clean_mind_map_label(data.get("title") or fallback_title) or fallback_title
+    outline = _normalize_mind_map_outline(data.get("outline"))
+    if not outline:
+        outline = _outline_from_mermaid_text(str(data.get("mermaid") or ""))
+    if not outline:
+        outline = fallback_outline
+
+    return {
+        "title": title,
+        "outline": outline,
+        "mermaid": _build_mermaid_mind_map(title, outline),
+    }
 
 
 async def generate_rich_notes(session_doc: dict[str, Any]) -> str:
