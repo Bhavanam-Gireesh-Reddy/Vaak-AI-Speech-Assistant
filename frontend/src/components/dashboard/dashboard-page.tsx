@@ -7,9 +7,13 @@ import {
   Mic2,
   Radar,
   ScrollText,
+  Sparkles,
 } from "lucide-react";
 
+import { LogoutButton } from "@/components/app/logout-button";
+import { UserSummary } from "@/components/app/user-summary";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+import type { AuthUser } from "@/lib/auth-types";
 import {
   buildDayBuckets,
   getDurationMinutes,
@@ -47,7 +51,35 @@ function StatCard({
   );
 }
 
-export function DashboardClientPage() {
+function DashboardHero({ user }: { user: AuthUser }) {
+  return (
+    <section className="grid gap-5 rounded-[30px] border border-white/70 bg-white/90 p-7 shadow-[0_28px_70px_rgba(15,23,42,0.08)] backdrop-blur xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+      <div className="max-w-3xl">
+        <div className="inline-flex items-center gap-2 rounded-full bg-sky-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
+          <Sparkles className="h-3.5 w-3.5" />
+          Workspace
+        </div>
+        <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+          Sessions, analytics, and admin controls
+        </h2>
+        <p className="mt-3 text-sm leading-7 text-slate-600">
+          Your Next.js frontend now sits on top of the existing FastAPI backend
+          with protected routes, shared navigation, and authenticated data
+          access.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-4 xl:min-w-[420px]">
+        <UserSummary user={user} />
+        <div className="flex justify-end">
+          <LogoutButton />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function DashboardClientPage({ user }: { user: AuthUser }) {
   const { isLoading, error, stats, recentSessions } = useDashboardData();
 
   const totalWords = stats.reduce(
@@ -83,22 +115,30 @@ export function DashboardClientPage() {
 
   if (isLoading) {
     return (
-      <div className="rounded-[28px] border border-slate-200 bg-white/90 p-8 text-sm text-slate-500 shadow-[0_26px_60px_rgba(15,23,42,0.08)]">
-        Loading dashboard analytics...
+      <div className="grid gap-6">
+        <DashboardHero user={user} />
+        <div className="rounded-[28px] border border-slate-200 bg-white/90 p-8 text-sm text-slate-500 shadow-[0_26px_60px_rgba(15,23,42,0.08)]">
+          Loading dashboard analytics...
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-[28px] border border-rose-200 bg-rose-50 p-8 text-sm text-rose-700 shadow-[0_20px_40px_rgba(244,63,94,0.08)]">
-        {error}
+      <div className="grid gap-6">
+        <DashboardHero user={user} />
+        <div className="rounded-[28px] border border-rose-200 bg-rose-50 p-8 text-sm text-rose-700 shadow-[0_20px_40px_rgba(244,63,94,0.08)]">
+          {error}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="grid gap-6">
+      <DashboardHero user={user} />
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           detail="Tracked across your saved sessions"

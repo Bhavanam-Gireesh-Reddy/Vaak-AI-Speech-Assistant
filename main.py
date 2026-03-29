@@ -121,6 +121,10 @@ def get_frontend_url() -> str | None:
     return "http://127.0.0.1:3000"
 
 
+def is_deployed_environment() -> bool:
+    return os.getenv("RENDER") == "true" or os.getenv("NODE_ENV") == "production"
+
+
 def build_cors_origins() -> list[str]:
     origins = {
         "http://localhost:3000",
@@ -684,6 +688,16 @@ async def youtube_import(body: dict, request: Request, x_api_key: str = Header(d
     cookies_content = (body.get("cookies_content") or "").strip()
     if not url:
         return JSONResponse({"error": "YouTube URL is required"}, status_code=400)
+    if auth_browser and auth_browser != "paste" and is_deployed_environment():
+        return JSONResponse(
+            {
+                "error": (
+                    "Browser cookie import only works on a local machine where that browser is installed. "
+                    "On the deployed app, use 'Paste cookies' or 'No sign-in'."
+                )
+            },
+            status_code=400,
+        )
 
     try:
         yt_data = await build_youtube_session(url, auth_browser, cookies_content)

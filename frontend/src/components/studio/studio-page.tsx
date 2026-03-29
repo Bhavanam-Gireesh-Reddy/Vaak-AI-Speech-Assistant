@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Bot,
   Copy,
   Download,
   FileText,
@@ -128,7 +127,7 @@ function StudioCard({
 }) {
   return (
     <section
-      className={`rounded-[30px] border border-white/70 bg-white/90 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur ${className ?? ""}`}
+      className={`rounded-[30px] border border-white/70 bg-white/90 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur lg:p-7 ${className ?? ""}`}
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
@@ -137,10 +136,29 @@ function StudioCard({
             <p className="mt-2 text-sm leading-6 text-slate-500">{subtitle}</p>
           ) : null}
         </div>
-        {actions}
+        {actions ? <div className="shrink-0">{actions}</div> : null}
       </div>
-      <div className={`mt-5 ${bodyClassName ?? ""}`}>{children}</div>
+      <div className={`mt-6 ${bodyClassName ?? ""}`}>{children}</div>
     </section>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex h-full min-h-[132px] flex-col justify-between rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-6 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+        {value}
+      </p>
+    </div>
   );
 }
 
@@ -185,6 +203,7 @@ export function StudioPageClient() {
   const [youtubeCookies, setYoutubeCookies] = useState("");
   const [busyKey, setBusyKey] = useState("");
   const [error, setError] = useState("");
+  const [isHostedEnvironment, setIsHostedEnvironment] = useState(false);
   const [youtubeStatus, setYoutubeStatus] = useState(
     "Import a YouTube transcript and turn it into a normal study session.",
   );
@@ -205,6 +224,13 @@ export function StudioPageClient() {
       .toLowerCase();
     return hay.includes(q);
   });
+
+  useEffect(() => {
+    setIsHostedEnvironment(
+      typeof window !== "undefined" &&
+        !["localhost", "127.0.0.1"].includes(window.location.hostname),
+    );
+  }, []);
 
   useEffect(() => {
     async function initializeStudio() {
@@ -459,7 +485,7 @@ export function StudioPageClient() {
   const currentQuiz = detail?.quiz?.questions?.[0];
 
   return (
-    <div className="grid gap-6 pb-6">
+    <div className="grid gap-8 pb-8">
       <section className="rounded-[30px] border border-white/70 bg-white/90 p-7 shadow-[0_28px_70px_rgba(15,23,42,0.08)] backdrop-blur">
         <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
           Studio
@@ -475,13 +501,13 @@ export function StudioPageClient() {
       </section>
 
       {error ? (
-        <div className="rounded-[24px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+        <div className="rounded-[24px] border border-rose-200 bg-rose-50 px-6 py-4 text-sm leading-6 text-rose-700">
           {error}
         </div>
       ) : null}
 
-      <div className="grid items-start gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <aside className="space-y-6 xl:sticky xl:top-6">
+      <div className="grid items-start gap-8 xl:grid-cols-[340px_minmax(0,1fr)]">
+        <aside className="space-y-5 xl:sticky xl:top-6">
           <StudioCard
             subtitle={youtubeStatus}
             title="YouTube import"
@@ -503,13 +529,30 @@ export function StudioPageClient() {
                 value={youtubeBrowser}
               >
                 <option value="">No sign-in</option>
-                <option value="chrome">Use Chrome cookies</option>
-                <option value="edge">Use Edge cookies</option>
-                <option value="firefox">Use Firefox cookies</option>
-                <option value="brave">Use Brave cookies</option>
-                <option value="safari">Use Safari cookies</option>
+                <option disabled={isHostedEnvironment} value="chrome">
+                  Use Chrome cookies{isHostedEnvironment ? " (local only)" : ""}
+                </option>
+                <option disabled={isHostedEnvironment} value="edge">
+                  Use Edge cookies{isHostedEnvironment ? " (local only)" : ""}
+                </option>
+                <option disabled={isHostedEnvironment} value="firefox">
+                  Use Firefox cookies{isHostedEnvironment ? " (local only)" : ""}
+                </option>
+                <option disabled={isHostedEnvironment} value="brave">
+                  Use Brave cookies{isHostedEnvironment ? " (local only)" : ""}
+                </option>
+                <option disabled={isHostedEnvironment} value="safari">
+                  Use Safari cookies{isHostedEnvironment ? " (local only)" : ""}
+                </option>
                 <option value="paste">Paste cookies</option>
               </select>
+              {isHostedEnvironment ? (
+                <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+                  Browser-cookie import works only on local development machines.
+                  On the deployed app, use <span className="font-semibold">Paste cookies</span> or{" "}
+                  <span className="font-semibold">No sign-in</span>.
+                </p>
+              ) : null}
               {youtubeBrowser === "paste" ? (
                 <textarea
                   className="min-h-[110px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
@@ -582,14 +625,14 @@ export function StudioPageClient() {
           </StudioCard>
         </aside>
 
-        <div className="min-w-0 space-y-6">
+        <div className="min-w-0 space-y-8">
           {!detail ? (
             <div className="rounded-[30px] border border-white/70 bg-white/90 p-10 text-center text-sm leading-6 text-slate-500 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur">
               Select a session to unlock translations, AI artifacts, and transcript chat.
             </div>
           ) : (
             <>
-              <section className="grid items-stretch gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+              <section className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
                 <StudioCard
                   subtitle={
                     detail.source_type === "youtube"
@@ -616,43 +659,27 @@ export function StudioPageClient() {
                   </div>
                 </StudioCard>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] h-full">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                      Words
-                    </p>
-                    <p className="mt-4 text-2xl font-semibold text-slate-950">
-                      {(detail.word_count ?? 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] h-full">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                      Sentences
-                    </p>
-                    <p className="mt-4 text-2xl font-semibold text-slate-950">
-                      {(detail.sentence_count ?? 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] h-full">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                      Speakers
-                    </p>
-                    <p className="mt-4 text-2xl font-semibold text-slate-950">
-                      {(detail.speakers?.length ?? 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] h-full">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                      Avg sentiment
-                    </p>
-                    <p className="mt-4 text-2xl font-semibold text-slate-950">
-                      {(detail.sentiment_summary?.average_score ?? 0).toFixed(2)}
-                    </p>
-                  </div>
+                <div className="grid auto-rows-fr gap-4 sm:grid-cols-2">
+                  <MetricCard
+                    label="Words"
+                    value={(detail.word_count ?? 0).toLocaleString()}
+                  />
+                  <MetricCard
+                    label="Sentences"
+                    value={(detail.sentence_count ?? 0).toLocaleString()}
+                  />
+                  <MetricCard
+                    label="Speakers"
+                    value={(detail.speakers?.length ?? 0).toLocaleString()}
+                  />
+                  <MetricCard
+                    label="Avg sentiment"
+                    value={(detail.sentiment_summary?.average_score ?? 0).toFixed(2)}
+                  />
                 </div>
               </section>
 
-              <section className="grid items-stretch gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)]">
+              <section className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)]">
                 <StudioCard
                   bodyClassName="h-full"
                   className="h-full"
@@ -760,7 +787,7 @@ export function StudioPageClient() {
                   {translationValue || 'Choose a language and click "Generate".'}
                 </pre>
               </StudioCard>
-              <section className="grid items-stretch gap-6 xl:grid-cols-2">
+              <section className="grid items-stretch gap-5 xl:grid-cols-2">
                 <StudioCard
                   bodyClassName="h-full"
                   className="h-full"
@@ -942,19 +969,9 @@ export function StudioPageClient() {
                 bodyClassName="h-full"
                 title="Transcript chat"
                 subtitle="Ask questions against the selected transcript and keep the conversation grounded in session context."
-                actions={
-                  <ActionButton
-                    busy={busyKey === "chat"}
-                    onClick={() => void sendChat()}
-                    primary
-                  >
-                    <Bot className="h-4 w-4" />
-                    Send
-                  </ActionButton>
-                }
               >
                 <div className="space-y-4">
-                  <div className="max-h-[320px] space-y-3 overflow-y-auto rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="max-h-[360px] space-y-3 overflow-y-auto rounded-3xl border border-slate-200 bg-slate-50 p-5">
                     {chatHistory.length ? (
                       chatHistory.map((message, index) => (
                         <div
@@ -984,7 +1001,7 @@ export function StudioPageClient() {
                       placeholder="Ask about decisions, action items, concepts, or follow-ups."
                       value={chatInput}
                     />
-                    <div className="sm:w-[180px]">
+                    <div className="sm:w-[180px] sm:self-end">
                       <ActionButton
                         busy={busyKey === "chat"}
                         onClick={() => void sendChat()}
