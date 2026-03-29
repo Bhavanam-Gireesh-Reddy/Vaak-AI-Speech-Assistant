@@ -56,6 +56,15 @@ const liveLightThemeOverrides = `
   .btn-nav:hover {
     background: #eff6ff !important;
   }
+
+  header {
+    display: none !important;
+  }
+
+  .app {
+    max-width: 1100px !important;
+    padding-top: 0 !important;
+  }
 </style>
 `;
 

@@ -116,16 +116,22 @@ function StudioCard({
   title,
   subtitle,
   actions,
+  bodyClassName,
+  className,
 }: {
   children: React.ReactNode;
   title: string;
   subtitle?: string;
   actions?: React.ReactNode;
+  bodyClassName?: string;
+  className?: string;
 }) {
   return (
-    <section className="rounded-[30px] border border-white/70 bg-white/90 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur">
-      <div className="flex items-start justify-between gap-4">
-        <div>
+    <section
+      className={`rounded-[30px] border border-white/70 bg-white/90 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur ${className ?? ""}`}
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h3 className="text-lg font-semibold text-slate-950">{title}</h3>
           {subtitle ? (
             <p className="mt-2 text-sm leading-6 text-slate-500">{subtitle}</p>
@@ -133,7 +139,7 @@ function StudioCard({
         </div>
         {actions}
       </div>
-      <div className="mt-5">{children}</div>
+      <div className={`mt-5 ${bodyClassName ?? ""}`}>{children}</div>
     </section>
   );
 }
@@ -453,7 +459,7 @@ export function StudioPageClient() {
   const currentQuiz = detail?.quiz?.questions?.[0];
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-6 pb-6">
       <section className="rounded-[30px] border border-white/70 bg-white/90 p-7 shadow-[0_28px_70px_rgba(15,23,42,0.08)] backdrop-blur">
         <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
           Studio
@@ -474,8 +480,8 @@ export function StudioPageClient() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
-        <aside className="space-y-6">
+      <div className="grid items-start gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
+        <aside className="space-y-6 xl:sticky xl:top-6">
           <StudioCard
             subtitle={youtubeStatus}
             title="YouTube import"
@@ -542,7 +548,7 @@ export function StudioPageClient() {
                 value={search}
               />
             </label>
-            <div className="mt-4 max-h-[calc(100vh-25rem)] space-y-3 overflow-y-auto pr-1">
+            <div className="mt-4 max-h-[calc(100vh-24rem)] space-y-3 overflow-y-auto pr-1">
               {filteredSessions.length ? (
                 filteredSessions.map((session) => (
                   <button
@@ -576,14 +582,14 @@ export function StudioPageClient() {
           </StudioCard>
         </aside>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           {!detail ? (
             <div className="rounded-[30px] border border-white/70 bg-white/90 p-10 text-center text-sm leading-6 text-slate-500 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur">
               Select a session to unlock translations, AI artifacts, and transcript chat.
             </div>
           ) : (
             <>
-              <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+              <section className="grid items-stretch gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
                 <StudioCard
                   subtitle={
                     detail.source_type === "youtube"
@@ -611,7 +617,7 @@ export function StudioPageClient() {
                 </StudioCard>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
+                  <div className="rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] h-full">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
                       Words
                     </p>
@@ -619,7 +625,7 @@ export function StudioPageClient() {
                       {(detail.word_count ?? 0).toLocaleString()}
                     </p>
                   </div>
-                  <div className="rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
+                  <div className="rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] h-full">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
                       Sentences
                     </p>
@@ -627,7 +633,7 @@ export function StudioPageClient() {
                       {(detail.sentence_count ?? 0).toLocaleString()}
                     </p>
                   </div>
-                  <div className="rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
+                  <div className="rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] h-full">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
                       Speakers
                     </p>
@@ -635,7 +641,7 @@ export function StudioPageClient() {
                       {(detail.speakers?.length ?? 0).toLocaleString()}
                     </p>
                   </div>
-                  <div className="rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
+                  <div className="rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] h-full">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
                       Avg sentiment
                     </p>
@@ -646,9 +652,13 @@ export function StudioPageClient() {
                 </div>
               </section>
 
-              <section className="grid gap-6 xl:grid-cols-[1fr_0.95fr]">
-                <StudioCard title="Summary and notes">
-                  <pre className="whitespace-pre-wrap rounded-3xl border border-slate-200 bg-slate-50 p-5 font-mono text-sm leading-7 text-slate-700">
+              <section className="grid items-stretch gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)]">
+                <StudioCard
+                  bodyClassName="h-full"
+                  className="h-full"
+                  title="Summary and notes"
+                >
+                  <pre className="h-full min-h-[340px] whitespace-pre-wrap rounded-3xl border border-slate-200 bg-slate-50 p-5 font-mono text-sm leading-7 text-slate-700">
                     {[
                       detail.summary ? `SUMMARY\n${detail.summary}` : "",
                       detail.notes ? `NOTES\n${detail.notes}` : "",
@@ -659,10 +669,15 @@ export function StudioPageClient() {
                   </pre>
                 </StudioCard>
 
-                <StudioCard title="Speakers and sentiment">
-                  <div className="space-y-4">
+                <StudioCard
+                  bodyClassName="h-full"
+                  className="h-full"
+                  title="Speakers and sentiment"
+                >
+                  <div className="flex h-full min-h-[340px] flex-col gap-4">
                     {detail.speakers?.length ? (
-                      detail.speakers.map((speaker, index) => (
+                      <div className="space-y-3 overflow-y-auto pr-1">
+                        {detail.speakers.map((speaker, index) => (
                         <div
                           key={`${speaker.speaker ?? "speaker"}-${index}`}
                           className="flex gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4"
@@ -674,13 +689,14 @@ export function StudioPageClient() {
                             {speaker.text || ""}
                           </p>
                         </div>
-                      ))
+                        ))}
+                      </div>
                     ) : (
                       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
                         Speaker detection is not available for this session yet.
                       </div>
                     )}
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="mt-auto grid gap-3 sm:grid-cols-3">
                       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm">
                         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                           Overall
@@ -713,10 +729,12 @@ export function StudioPageClient() {
               </section>
 
               <StudioCard
+                bodyClassName="h-full"
+                className="h-full"
                 title="Multi-language output"
                 subtitle="Generate and cache translated transcript output on demand."
                 actions={
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                     <select
                       className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
                       onChange={(event) => setTranslationTarget(event.target.value)}
@@ -742,8 +760,10 @@ export function StudioPageClient() {
                   {translationValue || 'Choose a language and click "Generate".'}
                 </pre>
               </StudioCard>
-              <section className="grid gap-6 xl:grid-cols-2">
+              <section className="grid items-stretch gap-6 xl:grid-cols-2">
                 <StudioCard
+                  bodyClassName="h-full"
+                  className="h-full"
                   title="Rich notes"
                   subtitle="Extract detailed study notes from the selected session."
                   actions={
@@ -762,12 +782,14 @@ export function StudioPageClient() {
                     </div>
                   }
                 >
-                  <pre className="min-h-[220px] whitespace-pre-wrap rounded-3xl border border-slate-200 bg-slate-50 p-5 font-mono text-sm leading-7 text-slate-700">
+                  <pre className="h-full min-h-[260px] whitespace-pre-wrap rounded-3xl border border-slate-200 bg-slate-50 p-5 font-mono text-sm leading-7 text-slate-700">
                     {detail.rich_notes || "No rich notes generated yet."}
                   </pre>
                 </StudioCard>
 
                 <StudioCard
+                  bodyClassName="h-full"
+                  className="h-full"
                   title="Flashcards"
                   subtitle="Create revision cards grounded in the transcript."
                   actions={
@@ -781,7 +803,7 @@ export function StudioPageClient() {
                   }
                 >
                   {currentFlashcard ? (
-                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                    <div className="h-full rounded-3xl border border-slate-200 bg-slate-50 p-5">
                       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
                         First card
                       </p>
@@ -806,6 +828,8 @@ export function StudioPageClient() {
                 </StudioCard>
 
                 <StudioCard
+                  bodyClassName="h-full"
+                  className="h-full"
                   title="Quiz"
                   subtitle="Build a transcript-grounded multiple-choice quiz."
                   actions={
@@ -819,7 +843,7 @@ export function StudioPageClient() {
                   }
                 >
                   {currentQuiz ? (
-                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                    <div className="h-full rounded-3xl border border-slate-200 bg-slate-50 p-5">
                       <h4 className="text-lg font-semibold text-slate-950">
                         {currentQuiz.question || "Quiz question"}
                       </h4>
@@ -851,6 +875,8 @@ export function StudioPageClient() {
                 </StudioCard>
 
                 <StudioCard
+                  bodyClassName="h-full"
+                  className="h-full"
                   title="Podcast and mind map"
                   subtitle="Generate spoken recap scripts and downloadable mind-map source."
                   actions={
@@ -872,7 +898,7 @@ export function StudioPageClient() {
                     </div>
                   }
                 >
-                  <div className="space-y-4">
+                  <div className="flex h-full flex-col gap-4">
                     <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
                       <div className="flex flex-wrap gap-3">
                         <ActionButton onClick={playPodcast}>
@@ -913,6 +939,7 @@ export function StudioPageClient() {
               </section>
 
               <StudioCard
+                bodyClassName="h-full"
                 title="Transcript chat"
                 subtitle="Ask questions against the selected transcript and keep the conversation grounded in session context."
                 actions={
