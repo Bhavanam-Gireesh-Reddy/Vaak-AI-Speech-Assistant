@@ -1754,9 +1754,9 @@ grok -> Groq"></textarea>
         if (!raw) return;
         const payload = JSON.parse(raw);
         
-        // Anti-leak check: if the saved session belongs to a different user, clear it
-        if (currentUserId && payload.userId && currentUserId !== payload.userId) {
-          console.warn('[Security] User mismatch for restored session. Clearing localStorage.');
+        // Anti-leak check: if the saved session belongs to a different user or is from a legacy unauthenticated state, clear it
+        if (currentUserId && (payload.userId !== currentUserId)) {
+          console.warn('[Security] User mismatch or legacy session detected. Clearing localStorage.');
           localStorage.removeItem(STORAGE_KEY);
           return;
         }
