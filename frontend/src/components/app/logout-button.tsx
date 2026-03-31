@@ -16,6 +16,10 @@ export function LogoutButton() {
 
     try {
       await logout();
+      // Clear legacy storage to prevent data leakage between different users on the same browser
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("sarvam_session_v1");
+      }
       router.push("/login");
       router.refresh();
     } finally {

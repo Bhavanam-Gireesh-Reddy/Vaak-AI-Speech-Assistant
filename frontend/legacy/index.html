@@ -1730,6 +1730,7 @@ grok -> Groq"></textarea>
           correctedTranscript: window._correctedTranscript || null,
           sessionTitle: window._sessionTitle || null,
           savedAt: Date.now(),
+          userId: window._currentUserId || null,
         };
         // Save summary text
         const summaryBody = document.getElementById('summaryResultBody');
@@ -1747,11 +1748,19 @@ grok -> Groq"></textarea>
       }
     }
 
-    function restoreSessionFromStorage() {
+    function restoreSessionFromStorage(currentUserId) {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return;
         const payload = JSON.parse(raw);
+        
+        // Anti-leak check: if the saved session belongs to a different user, clear it
+        if (currentUserId && payload.userId && currentUserId !== payload.userId) {
+          console.warn('[Security] User mismatch for restored session. Clearing localStorage.');
+          localStorage.removeItem(STORAGE_KEY);
+          return;
+        }
+
         if (!payload.transcriptLog || !payload.transcriptLog.length) return;
 
         // Restore transcript log + counters
@@ -1824,7 +1833,7 @@ grok -> Groq"></textarea>
     }
     document.addEventListener('DOMContentLoaded', () => {
       initScrollListener();
-      restoreSessionFromStorage();
+      // restoreSessionFromStorage() is now called after auth check (v1/me) below
     });
 
     // ── Status ─────────────────────────────────────────────────────────────────
@@ -2019,9 +2028,19 @@ grok -> Groq"></textarea>
     (async () => {
       try {
         const res = await fetch('/api/auth/me');
-        if (!res.ok) return;
+        if (!res.ok) {
+          restoreSessionFromStorage(null);
+          return;
+        }
         const user = await res.json();
-        if (!user.email || user.email === 'local') return;
+        if (!user.email || user.email === 'local') {
+          restoreSessionFromStorage(null);
+          return;
+        }
+        
+        window._currentUserId = user.user_id || user.sub;
+        restoreSessionFromStorage(window._currentUserId);
+
         const menu = document.getElementById('userMenu');
         if (menu) {
           document.getElementById('userName').textContent = user.name || user.email;
