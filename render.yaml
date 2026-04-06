@@ -31,6 +31,14 @@ services:
         value: "false"
       - key: SECRET_KEY
         generateValue: true
+      - key: DEEPGRAM_API_KEY
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_PLAN_ID_PRO
+        sync: false
 
   # ── Next.js Frontend (Single Public URL) ─────────────────────────────────────
   # All traffic comes here. /api/* is transparently proxied to meetwise-api

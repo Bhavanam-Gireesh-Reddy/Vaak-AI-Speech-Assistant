@@ -13,10 +13,18 @@ import re
 from datetime import datetime, timezone
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Depends, Header
+try:
+    from deepgram_service import stream_to_deepgram
+    DEEPGRAM_AVAILABLE = True
+except ImportError:
+    DEEPGRAM_AVAILABLE = False
+    print("WARNING: deepgram_service.py not found or deepgram-sdk not installed.")
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Depends, Header, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import razorpay_service
 
 # ── Load .env file from project directory ────────────────────────────────────
 import pathlib as _pathlib
@@ -77,6 +85,8 @@ try:
         generate_translation,
         normalize_custom_vocabulary,
         summarize_sentiment_timeline,
+        generate_action_items,
+        extract_text_from_image,
     )
     AI_FEATURES_AVAILABLE = True
 except ImportError as e:
@@ -103,6 +113,7 @@ db_client      = None
 db_collection  = None
 users_col      = None
 redis_client   = None
+folders_col    = None
 
 
 def clean_origin(value: str) -> str | None:
@@ -144,7 +155,7 @@ def build_cors_origins() -> list[str]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db_client, db_collection, users_col, redis_client
+    global db_client, db_collection, users_col, redis_client, folders_col
     if LLM_AVAILABLE:
         llm_module.GROQ_API_KEY = GROQ_API_KEY
         llm_module.HEADERS["Authorization"] = f"Bearer {GROQ_API_KEY}"
@@ -156,9 +167,19 @@ async def lifespan(app: FastAPI):
             await db_client.admin.command("ping")
             db_collection = db_client[MONGO_DB][MONGO_COL]
             users_col     = db_client[MONGO_DB][MONGO_COL_USERS]
+            folders_col   = db_client[MONGO_DB]["folders"]
             # Ensure unique index on email
             await users_col.create_index("email", unique=True)
             await users_col.create_index("api_key", unique=True, sparse=True)
+            
+            # Text index for search
+            await db_collection.create_index([
+                ("transcript", "text"),
+                ("corrected_transcript", "text"),
+                ("summary", "text"),
+                ("notes", "text")
+            ], default_language="english")
+            
             print(f"✅ MongoDB connected → {MONGO_DB}.{MONGO_COL} + users")
         except Exception as e:
             print(f"❌ MongoDB connection failed: {e}")
@@ -262,6 +283,49 @@ async def health_check():
     )
 
 
+def get_user_pro_status(db_user: dict) -> dict:
+    """
+    Evaluates if a user is PRO based on:
+    1. Admin status (always PRO)
+    2. Paid is_pro status
+    3. 90-day trial window from created_at
+    """
+    if not db_user:
+        return {"is_pro": False, "is_trial": False, "days_left": 0}
+    
+    is_admin = bool(db_user.get("is_admin", False))
+    is_pro_paid = bool(db_user.get("is_pro", False))
+    
+    # Check trial status
+    created_at_str = db_user.get("created_at")
+    is_trial = False
+    days_left = 0
+    
+    if created_at_str:
+        try:
+            created_at = datetime.fromisoformat(created_at_str)
+            # Ensure timezone awareness if needed
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            
+            now = datetime.now(timezone.utc)
+            elapsed = (now - created_at).days
+            if elapsed < 90:
+                is_trial = True
+                days_left = 90 - elapsed
+        except Exception as e:
+            print(f"Error parsing created_at for user {db_user.get('email')}: {e}")
+
+    effective_pro = is_admin or is_pro_paid or is_trial
+    
+    return {
+        "is_pro": effective_pro,
+        "is_trial": is_trial and not (is_admin or is_pro_paid), # Only trial if not already Pro/Admin
+        "days_left": days_left if is_trial else 0,
+        "is_admin": is_admin
+    }
+
+
 # ── Auth page routes ──────────────────────────────────────────────────────────
 @app.get("/login")
 async def login_page(request: Request):
@@ -306,6 +370,7 @@ async def register(body: dict):
         "password_hash": hash_password(password),
         "api_key":       api_key,
         "is_admin":      is_first,
+        "is_pro":        is_first,
         "created_at":    datetime.now(timezone.utc).isoformat(),
     })
     if is_first:
@@ -454,11 +519,17 @@ async def me(request: Request):
     db_user = await users_col.find_one({"user_id": user["sub"]})
     if not db_user:
         return JSONResponse({"error": "User not found"}, status_code=404)
+    
+    status = get_user_pro_status(db_user)
+    
     return JSONResponse({
         "user_id": db_user["user_id"],
         "email": db_user["email"],
         "name": db_user.get("name", ""),
-        "is_admin": bool(db_user.get("is_admin", False))
+        "is_admin": status["is_admin"],
+        "is_pro": status["is_pro"],
+        "is_trial": status["is_trial"],
+        "days_left": status["days_left"]
     })
 
 
@@ -474,6 +545,71 @@ async def live(request: Request):
 @app.get("/history")
 async def history(request: Request):
     return frontend_redirect("/history")
+
+
+
+@app.get("/api/folders")
+async def get_folders(request: Request, x_api_key: str = Header(default="")):
+    if folders_col is None:
+        return JSONResponse({"error": "MongoDB not connected"}, status_code=503)
+    user = await get_authenticated_user(request, x_api_key)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    cursor = folders_col.find({"user_id": user["sub"]}, {"_id": 0}).sort("created_at", 1)
+    folders = await cursor.to_list(length=100)
+    return JSONResponse(folders)
+
+@app.post("/api/folders")
+async def create_folder(body: dict, request: Request, x_api_key: str = Header(default="")):
+    if folders_col is None:
+        return JSONResponse({"error": "MongoDB not connected"}, status_code=503)
+    user = await get_authenticated_user(request, x_api_key)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    name = (body.get("name") or "").strip()
+    color = (body.get("color") or "#cbd5e1").strip()
+    if not name:
+        return JSONResponse({"error": "Name required"}, status_code=400)
+    import secrets
+    folder_id = secrets.token_hex(8)
+    doc = {
+        "folder_id": folder_id,
+        "name": name,
+        "color": color,
+        "user_id": user["sub"],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await folders_col.insert_one(doc)
+    doc.pop("_id", None)
+    return JSONResponse(doc)
+
+@app.patch("/api/sessions/{session_id}/folder")
+async def assign_session_folder(session_id: str, body: dict, request: Request, x_api_key: str = Header(default="")):
+    if db_collection is None:
+        return JSONResponse({"error": "MongoDB not connected"}, status_code=503)
+    user = await get_authenticated_user(request, x_api_key)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    folder_id = body.get("folder_id")
+    update_data = {"folder_id": folder_id} if folder_id else {"folder_id": None}
+    await db_collection.update_one({"session_id": session_id, "user_id": user.get("sub", "")}, {"$set": update_data})
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/ocr")
+async def ocr_image(request: Request, x_api_key: str = Header(default=""), file: UploadFile = File(...)):
+    """Extract text from an uploaded image using Groq Vision LLM."""
+    user = await get_authenticated_user(request, x_api_key)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    if not AI_FEATURES_AVAILABLE:
+        return JSONResponse({"error": "AI features not available."}, status_code=503)
+    contents = await file.read()
+    mime = file.content_type or "image/jpeg"
+    result = await extract_text_from_image(contents, mime)
+    if result.get("error"):
+        return JSONResponse({"error": result["error"]}, status_code=500)
+    return JSONResponse({"text": result["text"], "summary": result["summary"]})
 
 
 @app.get("/api/sessions")
@@ -496,13 +632,18 @@ async def search_sessions(request: Request, q: str = "", field: str = "all"):
         cursor = db_collection.find(base_query, {"_id": 0}).sort("started_at", -1).limit(100)
         sessions = await cursor.to_list(length=100)
         return JSONResponse({"sessions": sessions})
-    pattern = {"$regex": q, "$options": "i"}
-    text_query = {"$or": [
-        {"transcript": pattern}, {"corrected_transcript": pattern},
-        {"filtered_transcript": pattern}, {"summary": pattern},
-    ]} if field == "all" else {field: pattern}
+    if field == "all":
+        text_query = {"$text": {"$search": q}}
+        sort_opts = [("score", {"$meta": "textScore"}), ("started_at", -1)]
+        projection = {"_id": 0, "score": {"$meta": "textScore"}}
+    else:
+        pattern = {"$regex": q, "$options": "i"}
+        text_query = {field: pattern}
+        sort_opts = [("started_at", -1)]
+        projection = {"_id": 0}
+
     query  = {"$and": [base_query, text_query]} if base_query else text_query
-    cursor = db_collection.find(query, {"_id": 0}).sort("started_at", -1).limit(100)
+    cursor = db_collection.find(query, projection).sort(sort_opts).limit(100)
     sessions = await cursor.to_list(length=100)
     return JSONResponse({"sessions": sessions})
 
@@ -638,6 +779,21 @@ async def session_mindmap(session_id: str, body: dict, request: Request, x_api_k
     mind_map = await generate_mind_map(doc)
     await db_collection.update_one({"session_id": session_id, "user_id": user.get("sub", "")}, {"$set": {"mind_map": mind_map}})
     return JSONResponse({"mind_map": mind_map, "cached": False})
+
+
+@app.post("/api/sessions/{session_id}/action_items")
+async def session_action_items(session_id: str, body: dict, request: Request, x_api_key: str = Header(default="")):
+    if not AI_FEATURES_AVAILABLE or not LLM_AVAILABLE:
+        return JSONResponse({"error": "AI features are not available"}, status_code=503)
+    result, error = await get_session_for_user(session_id, request, x_api_key)
+    if error:
+        return error
+    doc, user = result
+    if doc.get("action_items") and not body.get("regenerate"):
+        return JSONResponse({"action_items": doc["action_items"], "cached": True})
+    action_items = await generate_action_items(doc)
+    await db_collection.update_one({"session_id": session_id, "user_id": user.get("sub", "")}, {"$set": {"action_items": action_items}})
+    return JSONResponse({"action_items": action_items, "cached": False})
 
 
 @app.post("/api/sessions/{session_id}/rich_notes")
@@ -1282,19 +1438,166 @@ async def broadcast_event(session_id: str, client_ws: WebSocket, message: dict):
         pass
 
 
+
+# ── Payments ──────────────────────────────────────────────────────────────────
+@app.post("/api/payments/create")
+async def create_payment(body: dict, request: Request):
+    """Creates a Razorpay Order (lifetime) or Subscription (monthly)."""
+    user = await require_api_auth(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+    plan_type = body.get("type", "lifetime") # 'lifetime' or 'monthly'
+    user_id = user.get("sub", "local")
+
+    try:
+        if plan_type == "monthly":
+            res = razorpay_service.create_monthly_subscription(
+                plan_id=os.getenv("RAZORPAY_PLAN_ID_PRO", "plan_fake_123"),
+                user_id=user_id
+            )
+        else:
+            res = razorpay_service.create_one_time_order(amount_in_inr=999, user_id=user_id)
+        
+        # Include key_id for frontend initialization
+        res["key_id"] = razorpay_service.RAZORPAY_KEY_ID
+        return JSONResponse({"ok": True, "data": res})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+@app.post("/api/payments/verify")
+async def verify_payment(body: dict, request: Request):
+    """Verifies Razorpay signature and upgrades user to Pro status."""
+    user = await require_api_auth(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+    user_id = user.get("sub", "local")
+    razorpay_payment_id = body.get("razorpay_payment_id")
+    razorpay_signature = body.get("razorpay_signature")
+    razorpay_order_id = body.get("razorpay_order_id")
+    razorpay_subscription_id = body.get("razorpay_subscription_id")
+
+    verified = False
+    if razorpay_order_id:
+        verified = razorpay_service.verify_payment_signature(
+            razorpay_order_id, razorpay_payment_id, razorpay_signature
+        )
+    elif razorpay_subscription_id:
+        verified = razorpay_service.verify_subscription_signature(
+            razorpay_subscription_id, razorpay_payment_id, razorpay_signature
+        )
+
+    if not verified:
+        return JSONResponse({"error": "Invalid signature"}, status_code=400)
+
+    if users_col is not None and user_id != "local":
+        update_data = {
+            "is_pro": True,
+            "pro_since": datetime.now(timezone.utc).isoformat(),
+            "last_payment_id": razorpay_payment_id
+        }
+        if razorpay_subscription_id:
+            update_data["subscription_id"] = razorpay_subscription_id
+        await users_col.update_one({"user_id": user_id}, {"$set": update_data})
+    return JSONResponse({"ok": True, "message": "Payment verified. You are now PRO!"})
+
 # ── WebSocket ─────────────────────────────────────────────────────────────────
-@app.websocket("/ws/translate")
-async def translate_ws(client_ws: WebSocket):
+@app.websocket("/ws/diarize")
+async def diarize_ws(client_ws: WebSocket):
+    """Real-time speaker diarization via Deepgram."""
     await client_ws.accept()
-    # Identify user from cookie if auth enabled
+    if not DEEPGRAM_AVAILABLE:
+        await client_ws.send_json({"type": "error", "message": "Deepgram service not available."})
+        await client_ws.close()
+        return
+
+    # ── Pro & Admin Check ──
+    is_pro = False
     ws_user_id = ""
     if AUTH_AVAILABLE:
-        # Try query param first (browsers don't send cookies over WebSocket on HTTPS)
         token = client_ws.query_params.get("token") or client_ws.cookies.get("auth_token")
         if token:
             payload = decode_token(token)
             if payload:
                 ws_user_id = payload.get("sub", "")
+                if users_col:
+                    db_user = await users_col.find_one({"user_id": ws_user_id})
+                    if db_user:
+                        status = get_user_pro_status(db_user)
+                        is_pro = status["is_pro"]
+    
+    if not is_pro and ws_user_id != "local":
+        await client_ws.send_json({"type": "error", "message": "Speaker ID is a Pro feature. Please upgrade to unlock."})
+        await client_ws.close()
+        return
+
+    start_time_limit = datetime.now(timezone.utc)
+
+    async def audio_generator():
+        try:
+            while True:
+                # ── 5 Minute Limit for Free Users ──
+                if not is_pro and ws_user_id != "local":
+                    elapsed = (datetime.now(timezone.utc) - start_time_limit).total_seconds()
+                    if elapsed > 300: # 5 minutes
+                        await client_ws.send_json({"type": "error", "message": "Free 5-minute limit reached. Upgrade to Pro for unlimited recordings."})
+                        break
+
+                msg = await client_ws.receive()
+                if msg["type"] == "websocket.receive":
+                    if "bytes" in msg and msg["bytes"]:
+                        yield msg["bytes"]
+                    elif "text" in msg and msg["text"]:
+                        data = json.loads(msg["text"])
+                        if data.get("action") == "stop":
+                            break
+        except Exception:
+            pass
+
+    try:
+        async for result in stream_to_deepgram(audio_generator()):
+            if "error" in result:
+                await client_ws.send_json({"type": "error", "message": result["error"]})
+                break
+            await client_ws.send_json({
+                "type": "transcript",
+                "text": result["text"],
+                "speaker": result["speaker"],
+                "is_final": result["is_final"],
+            })
+    except Exception as e:
+        try:
+            await client_ws.send_json({"type": "error", "message": str(e)})
+        except Exception:
+            pass
+    finally:
+        try:
+            await client_ws.close()
+        except Exception:
+            pass
+
+
+@app.websocket("/ws/translate")
+async def translate_ws(client_ws: WebSocket):
+    await client_ws.accept()
+    # Identify user from cookie if auth enabled
+    ws_user_id = ""
+    is_pro = False
+    if AUTH_AVAILABLE:
+        # Try query param first
+        token = client_ws.query_params.get("token") or client_ws.cookies.get("auth_token")
+        if token:
+            payload = decode_token(token)
+            if payload:
+                ws_user_id = payload.get("sub", "")
+                if users_col:
+                    db_user = await users_col.find_one({"user_id": ws_user_id})
+                    if db_user:
+                        status = get_user_pro_status(db_user)
+                        is_pro = status["is_pro"]
+
+    start_time_limit = datetime.now(timezone.utc)
 
     try:
         settings_raw = await asyncio.wait_for(client_ws.receive_text(), timeout=10)
@@ -1411,6 +1714,14 @@ async def translate_ws(client_ws: WebSocket):
         nonlocal pcm_buffer, session_active
         try:
             while True:
+                # ── 5 Minute Limit for Free Users ──
+                if not is_pro and ws_user_id != "local":
+                    elapsed = (datetime.now(timezone.utc) - start_time_limit).total_seconds()
+                    if elapsed > 300: # 5 minutes
+                        await client_ws.send_json({"type": "error", "message": "Free 5-minute limit reached. Upgrade to Pro for unlimited recordings."})
+                        session_active = False
+                        break
+
                 # Receive either bytes (audio) or text (control like "stop")
                 msg = await client_ws.receive()
                 if msg["type"] == "websocket.receive":
@@ -1500,16 +1811,24 @@ async def translate_ws(client_ws: WebSocket):
 
         # 2. Send analysis results to browser while connection is open
         try:
+            # Payload restriction for non-pro users
+            display_summary = result.get("summary", "")
+            display_notes = result.get("notes", "")
+            
+            if not is_pro and ws_user_id != "local":
+                display_summary = "Upgrade to PRO to unlock AI summaries of your meetings."
+                display_notes = "Upgrade to PRO to unlock detailed action items and notes."
+
             await broadcast_event(session_id, client_ws, {
                 "type":                "session_analysis",
-                "summary":             result.get("summary", ""),
-                "notes":               result.get("notes", ""),
+                "summary":             display_summary,
+                "notes":               display_notes,
                 "filtered_transcript": result.get("filtered_transcript", ""),
                 "corrected_transcript":result.get("corrected_transcript", ""),
                 "title":               result.get("title", ""),
                 "speakers":            result.get("speakers", []),
             })
-            print(f"  [LLM] Sent → title:'{result.get('title','')}' summary:{len(result.get('summary',''))} chars notes:{len(result.get('notes',''))} chars")
+            print(f"  [LLM] Sent (Pro:{is_pro}) → title:'{result.get('title','')}'")
         except Exception as e:
             print(f"  [LLM] Send error: {e}")
 

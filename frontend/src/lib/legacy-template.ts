@@ -98,22 +98,20 @@ export async function buildLegacyLiveHtml(authToken: string) {
     `const uploadToken = ${JSON.stringify(authToken)};`,
   );
   // Ensure WebSocket connections target the backend directly
-  html = html.replaceAll(
-    "`${proto}://${location.host}/ws/translate",
-    `\`${backendWsBase}/ws/translate`
-  );
-  html = html.replaceAll(
-    '"${proto}://${location.host}/ws/translate',
-    `"${backendWsBase}/ws/translate`
-  );
-  html = html.replaceAll(
-    "'${proto}://${location.host}/ws/translate",
-    `'${backendWsBase}/ws/translate`
-  );
-  html = html.replaceAll(
-    "${wsProto}//${location.host}/ws/translate",
-    `${backendWsBase}/ws/translate`
-  );
+  const wsReplacements = [
+    ["`${proto}://${location.host}/ws/translate", `\`${backendWsBase}/ws/translate`],
+    ['"${proto}://${location.host}/ws/translate', `"${backendWsBase}/ws/translate`],
+    ["'${proto}://${location.host}/ws/translate", `'${backendWsBase}/ws/translate`],
+    ["${wsProto}//${location.host}/ws/translate", `${backendWsBase}/ws/translate`],
+    
+    // New dynamic endpoint replacements
+    ["`${wsProto}//${location.host}${wsEndpoint}", `\`${backendWsBase}\${wsEndpoint}`],
+    ["${wsProto}//${location.host}${wsEndpoint}", `${backendWsBase}\${wsEndpoint}`]
+  ];
+  
+  for (const repl of wsReplacements) {
+    html = html.replaceAll(repl[0], repl[1]);
+  }
   html = html.replaceAll("window.location.href =", "window.top.location.href =");
 
   return html;

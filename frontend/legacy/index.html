@@ -8,6 +8,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap"
     rel="stylesheet" />
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <style>
     /* ── Reset & Base ────────────────────────────────────── */
     *,
@@ -760,6 +761,57 @@
       color: var(--accent);
     }
 
+    
+    /* ── Toggle Switch ───────────────────────────────────── */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 34px;
+      height: 20px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #1e2d40;
+      transition: .4s;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 2px;
+      bottom: 2px;
+      background-color: var(--muted);
+      transition: .4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: rgba(0, 212, 255, 0.1);
+      border-color: var(--accent);
+    }
+    input:checked + .slider:before {
+      transform: translateX(14px);
+      background-color: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     /* ── DB badge ─────────────────────────────────────────── */
     #dbBadge.ok {
       border-color: rgba(34, 197, 94, 0.4);
@@ -1010,6 +1062,25 @@
         grid-template-columns: 1fr;
       }
     }
+
+    /* ── Locked Features ─────────────────────────────────── */
+    .toggle-container.locked {
+      position: relative;
+      cursor: help !important;
+    }
+    .toggle-container.locked::after {
+      content: 'PRO';
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: var(--accent2);
+      color: white;
+      font-size: 8px;
+      font-weight: 800;
+      padding: 1px 4px;
+      border-radius: 4px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
   </style>
   <script src="/auth-helper.js"></script>
 </head>
@@ -1021,15 +1092,18 @@
     <header>
       <div class="logo">
         <div class="logo-icon">🎙</div>
-        <div class="logo-text">Live <span>Translation</span></div>
-        <div class="badge">SAARAS V3</div>
+        <div class="logo-text">MeetWise <span>AI</span></div>
+        <div id="user-badge" class="badge" style="display:none; border-color: var(--accent); color: var(--accent);">PRO</div>
         <div class="badge" id="dbBadge" style="border-color:#1e2d40; color:#6b8299;">DB ●</div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <a href="/live" class="btn-nav active">🎙 Live</a>
-        <a href="/history" class="btn-nav">📋 History</a>
-        <a href="/studio" class="btn-nav">🧠 Studio</a>
-        <a href="/dashboard" class="btn-nav">📊 Dashboard</a>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button id="upgrade-btn" class="btn" onclick="showUpgradeModal()" style="display:none; padding:6px 14px; font-size:11px; background:linear-gradient(135deg, #7c3aed, #00d4ff); border:none; color:white; border-radius:10px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(124,58,237,0.3);">⭐ UPGRADE</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <a href="/live" class="btn-nav active">🎙 Live</a>
+          <a href="/history" class="btn-nav">📋 History</a>
+          <a href="/studio" class="btn-nav">🧠 Studio</a>
+          <a href="/dashboard" class="btn-nav">📊 Dashboard</a>
+        </div>
       </div>
       <div id="userMenu" style="display:none;align-items:center;gap:10px;">
         <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#6b8299;" id="userName"></span>
@@ -1095,6 +1169,16 @@
         </select>
 
         <div class="sep"></div>
+
+        
+        <div class="sep"></div>
+        <div class="toggle-container" title="Identify speakers in real-time (uses Deepgram)">
+          <span class="label">Speaker ID</span>
+          <label class="switch">
+            <input type="checkbox" id="diarizeToggle">
+            <span class="slider"></span>
+          </label>
+        </div>
 
         <button id="startBtn" class="btn btn-primary" onclick="startTranslation()">
           ▶ Start
@@ -1257,6 +1341,52 @@ grok -> Groq"></textarea>
     </footer>
   </div>
 
+  <!-- ── Upgrade Modal ── -->
+  <div id="upgrade-modal" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9999; align-items:center; justify-content:center; backdrop-filter:blur(10px);">
+    <div style="background:var(--surface); border:1px solid var(--border); border-radius:24px; padding:32px; width:95%; max-width:480px; position:relative; box-shadow:0 20px 60px rgba(0,0,0,0.6); animation: modalIn 0.3s ease-out;">
+      <button onclick="closeUpgradeModal()" style="position:absolute; top:20px; right:20px; background:none; border:none; color:var(--muted); cursor:pointer; font-size:24px; transition:color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--muted)'">&times;</button>
+      
+      <div style="text-align:center; margin-bottom:24px;">
+        <div style="width:50px; height:50px; background:linear-gradient(135deg, #7c3aed, var(--accent)); border-radius:12px; margin:0 auto 16px; display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 0 20px rgba(0, 212, 255, 0.3);">⭐</div>
+        <h2 style="font-size:26px; font-weight:800; margin-bottom:8px; letter-spacing:-0.5px;">Go Pro with MeetWise</h2>
+        <p style="color:var(--muted); font-size:14px; line-height:1.5;">Unlimited meeting time, real-time Speaker ID, and advanced AI-generated notes & summaries.</p>
+      </div>
+      
+      <div style="display:grid; gap:16px;">
+        <!-- Lifetime Plan -->
+        <div id="plan-lifetime" class="plan-card active" onclick="selectPlan('lifetime')" style="background:rgba(124,58,237,0.1); border:2px solid var(--accent2); border-radius:18px; padding:20px; cursor:pointer; transition:all 0.2s; position:relative;">
+          <div style="position:absolute; top:-10px; right:20px; background:var(--accent2); color:white; font-size:10px; padding:2px 10px; border-radius:20px; font-weight:800; box-shadow:0 4px 10px rgba(124,58,237,0.4);">BEST VALUE</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span style="font-weight:700; font-size:17px;">Lifetime Access</span>
+            <span style="color:var(--accent); font-weight:800; font-size:18px;">₹999</span>
+          </div>
+          <p style="font-size:12px; color:var(--text); opacity:0.7;">One-time payment. Full features forever.</p>
+        </div>
+
+        <!-- Monthly Plan -->
+        <div id="plan-monthly" class="plan-card" onclick="selectPlan('monthly')" style="background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:18px; padding:20px; cursor:pointer; transition:all 0.2s;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span style="font-weight:700; font-size:17px;">Monthly Pro</span>
+            <span style="color:var(--accent); font-weight:800; font-size:18px;">₹199<span style="font-size:12px; font-weight:400; opacity:0.6;"> / mo</span></span>
+          </div>
+          <p style="font-size:12px; color:var(--muted);">Billed monthly. Cancel anytime.</p>
+        </div>
+      </div>
+      
+      <button id="pay-now-btn" class="btn btn-primary" onclick="initiatePayment()" style="width:100%; margin-top:28px; justify-content:center; padding:16px; font-size:16px; background:linear-gradient(135deg, var(--accent2), var(--accent)); border:none; border-radius:14px; font-weight:700; box-shadow: 0 10px 25px rgba(124,58,237,0.3);">Upgrade Now</button>
+      <div style="text-align:center; margin-top:20px; font-size:11px; color:var(--muted); display:flex; align-items:center; justify-content:center; gap:6px;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> 
+        Secure Payment via Razorpay
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+    .plan-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+    .plan-card.active { box-shadow: 0 8px 24px rgba(124,58,237,0.15); }
+  </style>
+
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
@@ -1276,6 +1406,154 @@ grok -> Groq"></textarea>
     let userScrolled = false;   // true when user has scrolled up to read history
     let sentimentHistory = [];
     let selectedTargetLang = 'same';
+    let selectedPlanType = 'lifetime';
+    let isUserPro = false;
+
+    // ── Pro & Upgrade Logic ──
+    function showUpgradeModal() {
+      document.getElementById('upgrade-modal').style.display = 'flex';
+    }
+    function closeUpgradeModal() {
+      document.getElementById('upgrade-modal').style.display = 'none';
+    }
+    function selectPlan(type) {
+      selectedPlanType = type;
+      document.querySelectorAll('.plan-card').forEach(el => {
+        el.style.borderColor = 'var(--border)';
+        el.style.background = 'rgba(255,255,255,0.03)';
+      });
+      const active = document.getElementById(`plan-${type}`);
+      active.style.borderColor = 'var(--accent2)';
+      active.style.background = type === 'lifetime' ? 'rgba(124,58,237,0.1)' : 'rgba(0, 212, 255, 0.05)';
+    }
+
+    async function initiatePayment() {
+      const btn = document.getElementById('pay-now-btn');
+      btn.disabled = true;
+      btn.textContent = 'Processing...';
+
+      try {
+        const res = await fetch('/api/payments/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: selectedPlanType })
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Payment initiation failed');
+        
+        const data = result.data;
+        
+        if (data.mock) {
+          showToast('Mock Payment: Simulating success...', 'info');
+          setTimeout(() => completePayment(data, 'mock_payment_id', 'mock_signature'), 1500);
+          return;
+        }
+
+        const options = {
+          "key": data.key_id, 
+          "amount": data.amount,
+          "currency": data.currency || "INR",
+          "name": "MeetWise AI",
+          "description": selectedPlanType === 'lifetime' ? "Lifetime Pro Upgrade" : "Monthly Pro Subscription",
+          "order_id": data.id,
+          "subscription_id": selectedPlanType === 'monthly' ? data.id : undefined,
+          "handler": function (response) {
+            completePayment(data, response.razorpay_payment_id, response.razorpay_signature);
+          },
+          "prefill": {
+            "name": document.getElementById('userName').textContent,
+            "email": "" 
+          },
+          "theme": { "color": "#7c3aed" }
+        };
+        const rzp = new Razorpay(options);
+        rzp.open();
+      } catch (e) {
+        showToast(e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Upgrade Now';
+      }
+    }
+
+    async function completePayment(orderData, paymentId, signature) {
+      try {
+        const res = await fetch('/api/payments/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            razorpay_payment_id: paymentId,
+            razorpay_signature: signature,
+            razorpay_order_id: selectedPlanType === 'lifetime' ? orderData.id : undefined,
+            razorpay_subscription_id: selectedPlanType === 'monthly' ? orderData.id : undefined
+          })
+        });
+        const result = await res.json();
+        if (result.ok) {
+          showToast('⭐ Congratulations! You are now a PRO member.', 'success');
+          closeUpgradeModal();
+          // Update UI immediately
+          isUserPro = true;
+          updateProUI(true, false);
+        } else {
+          throw new Error(result.error || 'Verification failed');
+        }
+      } catch (e) {
+        showToast(e.message, 'error');
+      }
+    }
+
+    function updateProUI(isPro, isTrial = false, trialDays = 0) {
+      const badge = document.getElementById('user-badge');
+      const upgradeBtn = document.getElementById('upgrade-btn');
+      const diarizeToggle = document.getElementById('diarizeToggle');
+      
+      if (isPro) {
+        if (badge) {
+          badge.style.display = 'inline-flex';
+          if (isTrial) {
+            badge.textContent = 'PRO (TRIAL)';
+            badge.style.borderColor = 'var(--warn)';
+            badge.style.color = 'var(--warn)';
+            badge.title = `${trialDays} days remaining in your free trial`;
+          } else {
+            badge.textContent = 'PRO';
+            badge.style.borderColor = 'var(--accent)';
+            badge.style.color = 'var(--accent)';
+            badge.title = "Full Pro Access";
+          }
+        }
+        
+        // Show upgrade button even during trial so they can subscribe early
+        if (upgradeBtn) {
+          upgradeBtn.style.display = isTrial ? 'inline-flex' : 'none';
+          if (isTrial) {
+            upgradeBtn.textContent = '⭐ Lifetime Upgrade';
+            upgradeBtn.parentElement.title = `${trialDays} days left in trial. Upgrade now to keep Pro forever!`;
+          }
+        }
+
+        if (diarizeToggle) {
+          diarizeToggle.disabled = false;
+          diarizeToggle.parentElement.parentElement.classList.remove('locked');
+          diarizeToggle.parentElement.parentElement.title = "Identify speakers in real-time (uses Deepgram)";
+          diarizeToggle.parentElement.parentElement.style.opacity = '1';
+        }
+      } else {
+        if (badge) badge.style.display = 'none';
+        if (upgradeBtn) {
+          upgradeBtn.style.display = 'inline-flex';
+          upgradeBtn.textContent = '⭐ UPGRADE';
+        }
+        if (diarizeToggle) {
+          diarizeToggle.disabled = true;
+          diarizeToggle.checked = false;
+          diarizeToggle.parentElement.parentElement.classList.add('locked');
+          diarizeToggle.parentElement.parentElement.title = "PRO FEATURE: Speaker ID is only for Pro members.";
+          diarizeToggle.parentElement.parentElement.style.opacity = '0.5';
+        }
+      }
+    }
 
     // ── WebSocket + Audio ──────────────────────────────────────────────────────
     async function startTranslation() {
@@ -1310,15 +1588,36 @@ grok -> Groq"></textarea>
 
       // Request mic
       try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            sampleRate: 16000,
-            channelCount: 1,
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
+        const audioConstraints = {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        };
+        const diarizeEnabled = document.getElementById('diarizeToggle').checked;
+        if (diarizeEnabled) {
+          showToast('Please select "Share tab audio" in the popup to capture the meeting audio.', 'info');
+          const displayStream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+          const micStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+          
+          const audioCtx = new AudioContext({ sampleRate: 16000 });
+          const dest = audioCtx.createMediaStreamDestination();
+          
+          if (micStream.getAudioTracks().length > 0) {
+            audioCtx.createMediaStreamSource(micStream).connect(dest);
           }
-        });
+          if (displayStream.getAudioTracks().length > 0) {
+            audioCtx.createMediaStreamSource(displayStream).connect(dest);
+          } else {
+            showToast('Warning: No system audio shared! Only mic captured.', 'error');
+          }
+          
+          mediaStream = dest.stream;
+          displayStream.getVideoTracks().forEach(track => track.stop());
+        } else {
+          mediaStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+        }
       } catch (e) {
         showToast('⚠️ Microphone access denied: ' + e.message, 'error');
         setStatus('error', 'Mic denied');
@@ -1329,7 +1628,9 @@ grok -> Groq"></textarea>
       // Open WebSocket
       const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
       const authToken = localStorage.getItem('auth_token') || '';
-      const wsUrl = `${wsProto}//${location.host}/ws/translate${authToken ? '?token=' + encodeURIComponent(authToken) : ''}`;
+      const diarizeEnabled = document.getElementById('diarizeToggle').checked;
+      const wsEndpoint = diarizeEnabled ? '/ws/diarize' : '/ws/translate';
+      const wsUrl = `${wsProto}//${location.host}${wsEndpoint}${authToken ? '?token=' + encodeURIComponent(authToken) : ''}`;
       ws = new WebSocket(wsUrl);
       ws.binaryType = 'arraybuffer';
 
@@ -1517,7 +1818,11 @@ grok -> Groq"></textarea>
           break;
 
         case 'error':
-          showToast('❌ ' + msg.message, 'error');
+          if (msg.message && msg.message.includes("limit reached")) {
+            showToast('⏳ ' + msg.message + ' <a href="#" onclick="showUpgradeModal(); return false;" style="color:var(--accent); font-weight:700; text-decoration:underline; margin-left:8px;">Upgrade Now</a>', 'error');
+          } else {
+            showToast('❌ ' + msg.message, 'error');
+          }
           setStatus('error', 'Error');
           stopTranslation();
           break;
@@ -2035,6 +2340,8 @@ grok -> Groq"></textarea>
         const user = await res.json();
         if (!user.email || user.email === 'local') {
           restoreSessionFromStorage(null);
+          // For local/no-auth, default to PRO behavior or Hide upgrade
+          updateProUI(true);
           return;
         }
         
@@ -2050,6 +2357,10 @@ grok -> Groq"></textarea>
         if (adminLink) {
           adminLink.style.display = user.is_admin ? 'inline-flex' : 'none';
         }
+
+        // Update Pro UI
+        isUserPro = !!user.is_pro;
+        updateProUI(isUserPro, user.is_trial, user.days_left);
       } catch (e) { }
     })();
 

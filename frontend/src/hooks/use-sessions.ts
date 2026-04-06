@@ -171,6 +171,23 @@ export function useSessions() {
     return payload.share_url ?? null;
   }
 
+  async function extractActionItems(sessionId: string) {
+    const response = await fetch(`/api/sessions/${sessionId}/action_items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const payload = await readJson<{ action_items: any[] }>(response);
+    setSessions((current) =>
+      current.map((session) =>
+        session.session_id === sessionId
+          ? { ...session, action_items: payload.action_items }
+          : session,
+      ),
+    );
+    return payload.action_items;
+  }
+
   return {
     sessions,
     folders,
@@ -182,5 +199,6 @@ export function useSessions() {
     assignFolder,
     createFolder,
     toggleShare,
+    extractActionItems,
   };
 }
