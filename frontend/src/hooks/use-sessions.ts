@@ -177,7 +177,7 @@ export function useSessions() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
     });
-    const payload = await readJson<{ action_items: any[] }>(response);
+    const payload = await readJson<{ action_items: unknown[] }>(response);
     setSessions((current) =>
       current.map((session) =>
         session.session_id === sessionId

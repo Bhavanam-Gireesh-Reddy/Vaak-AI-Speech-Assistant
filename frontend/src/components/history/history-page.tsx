@@ -206,7 +206,7 @@ export function HistoryPage() {
       if (data.error) { setToast("OCR failed: " + data.error); return; }
       setOcrResult({ text: data.text ?? "", summary: data.summary ?? "" });
       setToast("Text extracted from image successfully!");
-    } catch (e) {
+    } catch {
       setToast("OCR upload failed.");
     } finally {
       setOcrLoading(false);
