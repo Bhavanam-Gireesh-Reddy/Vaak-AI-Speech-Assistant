@@ -1462,11 +1462,25 @@ async def diarize_ws(client_ws: WebSocket):
                     if db_user:
                         status = get_user_pro_status(db_user)
                         is_pro = status["is_pro"]
-    
+
+    # Allow when auth is disabled (self-hosted / local dev)
+    if not AUTH_AVAILABLE:
+        is_pro = True
+        ws_user_id = "local"
+
     if not is_pro and ws_user_id != "local":
         await client_ws.send_json({"type": "error", "message": "Speaker ID is a Pro feature. Please upgrade to unlock."})
         await client_ws.close()
         return
+
+    # ── Send ready signal so the UI updates from 'Connecting...' → 'Ready' ──
+    try:
+        await client_ws.send_json({
+            "type": "ready",
+            "message": "Deepgram connected — Speaker ID active",
+        })
+    except Exception:
+        pass
 
     start_time_limit = datetime.now(timezone.utc)
 
