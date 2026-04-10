@@ -1655,7 +1655,7 @@ grok -> Groq"></textarea>
         case 'transcript':
           // Remove partial if any
           if (partialEl) { partialEl.remove(); partialEl = null; }
-          appendEntry(msg.text, false, msg.keywords || []);
+          appendEntry(msg.text, false, msg.keywords || [], msg.speaker || null);
           break;
 
         case 'summary':
@@ -1718,7 +1718,7 @@ grok -> Groq"></textarea>
       if (es) es.remove();
     }
 
-    function appendEntry(text, isPartial, keywords = []) {
+    function appendEntry(text, isPartial, keywords = [], speaker = null) {
       const scroll = document.getElementById('transcriptScroll');
       const now = new Date().toLocaleTimeString('en-IN', { hour12: false });
       const mode = document.getElementById('modeSelect').value;
@@ -1726,8 +1726,15 @@ grok -> Groq"></textarea>
       const entry = document.createElement('div');
       entry.className = 'entry';
       const highlighted = highlightKeywords(escHtml(text), keywords);
+      
+      let metaText = `${now} · ${mode.toUpperCase()}`;
+      if (speaker && speaker !== 'unknown') {
+        const readableSpeaker = speaker.replace('speaker_', 'Speaker ');
+        metaText += ` · <span style="color: var(--accent); font-weight: 600;">${readableSpeaker}</span>`;
+      }
+
       entry.innerHTML = `
-    <div class="entry-meta">${now} · ${mode.toUpperCase()}</div>
+    <div class="entry-meta">${metaText}</div>
     <div class="entry-text${isPartial ? ' partial' : ''}">${highlighted}</div>
   `;
       scroll.appendChild(entry);
