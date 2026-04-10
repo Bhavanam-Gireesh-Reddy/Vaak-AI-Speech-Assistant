@@ -1170,7 +1170,16 @@
 
         
         <div class="sep"></div>
-        <div class="toggle-container" title="Identify speakers in real-time (uses Deepgram)">
+        <div class="toggle-container" title="Capture and transcribe system/tab audio via screen share (works without Pro)">
+          <span class="label">Share Audio</span>
+          <label class="switch">
+            <input type="checkbox" id="shareAudioToggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="sep"></div>
+        <div class="toggle-container" title="Identify speakers in real-time (uses Deepgram — Pro only)">
           <span class="label">Speaker ID</span>
           <label class="switch">
             <input type="checkbox" id="diarizeToggle">
@@ -1366,6 +1375,8 @@ grok -> Groq"></textarea>
     let selectedTargetLang = 'same';
     let selectedPlanType = 'lifetime';
     let isUserPro = false;
+    let _displayStream = null;  // kept alive for share-audio mode
+    let _micStream = null;      // kept alive for share-audio mode
 
     // ── Pro & Trial UI Updates ──
 
@@ -1438,7 +1449,7 @@ grok -> Groq"></textarea>
       const es = document.getElementById('emptyState');
       if (es && transcriptLog.length > 0) es.remove();
 
-      // Request mic
+      // Request mic / screen audio
       try {
         const audioConstraints = {
           sampleRate: 16000,
@@ -1448,31 +1459,38 @@ grok -> Groq"></textarea>
           autoGainControl: true,
         };
         const diarizeEnabled = document.getElementById('diarizeToggle').checked;
-        if (diarizeEnabled) {
-          showToast('Please select "Share tab audio" in the popup to capture the meeting audio.', 'info');
-          const displayStream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
-          const micStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
-          
-          const audioCtx = new AudioContext({ sampleRate: 16000 });
-          const dest = audioCtx.createMediaStreamDestination();
-          
-          if (micStream.getAudioTracks().length > 0) {
-            audioCtx.createMediaStreamSource(micStream).connect(dest);
+        const shareAudioEnabled = document.getElementById('shareAudioToggle') && document.getElementById('shareAudioToggle').checked;
+        const captureSystemAudio = shareAudioEnabled || diarizeEnabled;
+
+        if (captureSystemAudio) {
+          // ── Share Audio mode: capture display (system) audio + mic, mix them ──
+          showToast('📡 Select the tab/window to share — check "Share audio" in the dialog!', 'info');
+          _displayStream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+          _micStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+
+          // Use the global audioContext for mixing (critical: keeps the context alive)
+          audioContext = new AudioContext({ sampleRate: 16000 });
+          const dest = audioContext.createMediaStreamDestination();
+
+          if (_micStream.getAudioTracks().length > 0) {
+            audioContext.createMediaStreamSource(_micStream).connect(dest);
           }
-          if (displayStream.getAudioTracks().length > 0) {
-            audioCtx.createMediaStreamSource(displayStream).connect(dest);
+          if (_displayStream.getAudioTracks().length > 0) {
+            audioContext.createMediaStreamSource(_displayStream).connect(dest);
           } else {
-            showToast('Warning: No system audio shared! Only mic captured.', 'error');
+            showToast('⚠️ No tab audio detected — check "Share audio" was ticked in the dialog.', 'error');
           }
-          
+
           mediaStream = dest.stream;
-          displayStream.getVideoTracks().forEach(track => track.stop());
+          // Stop video tracks — we only need audio
+          _displayStream.getVideoTracks().forEach(track => track.stop());
         } else {
+          // ── Normal mic-only mode ──
           mediaStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
         }
       } catch (e) {
-        showToast('⚠️ Microphone access denied: ' + e.message, 'error');
-        setStatus('error', 'Mic denied');
+        showToast('⚠️ Audio access denied: ' + e.message, 'error');
+        setStatus('error', 'Access denied');
         document.getElementById('startBtn').disabled = false;
         return;
       }
@@ -1480,8 +1498,10 @@ grok -> Groq"></textarea>
       // Open WebSocket
       const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
       const authToken = localStorage.getItem('auth_token') || '';
-      const diarizeEnabled = document.getElementById('diarizeToggle').checked;
-      const wsEndpoint = diarizeEnabled ? '/ws/diarize' : '/ws/translate';
+      // IMPORTANT: Only use /ws/diarize (Deepgram) when Speaker ID is explicitly enabled.
+      // Share Audio alone uses /ws/translate (Sarvam) — no Deepgram required.
+      const diarizeEnabled2 = document.getElementById('diarizeToggle').checked;
+      const wsEndpoint = diarizeEnabled2 ? '/ws/diarize' : '/ws/translate';
       const wsUrl = `${wsProto}//${location.host}${wsEndpoint}${authToken ? '?token=' + encodeURIComponent(authToken) : ''}`;
       ws = new WebSocket(wsUrl);
       ws.binaryType = 'arraybuffer';
@@ -1507,7 +1527,11 @@ grok -> Groq"></textarea>
       };
 
       // Setup Web Audio → PCM pipeline
-      audioContext = new AudioContext({ sampleRate: 16000 });
+      // NOTE: In share-audio (diarize) mode, audioContext was already created above
+      // to mix display + mic streams. Re-use it here instead of making a second context.
+      if (!audioContext) {
+        audioContext = new AudioContext({ sampleRate: 16000 });
+      }
       const source = audioContext.createMediaStreamSource(mediaStream);
 
       analyser = audioContext.createAnalyser();
@@ -1560,6 +1584,9 @@ grok -> Groq"></textarea>
       if (processor) { processor.disconnect(); processor = null; }
       if (audioContext) { audioContext.close(); audioContext = null; }
       if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+      // Clean up share-audio streams (diarize mode)
+      if (_displayStream) { _displayStream.getTracks().forEach(t => t.stop()); _displayStream = null; }
+      if (_micStream) { _micStream.getTracks().forEach(t => t.stop()); _micStream = null; }
       stopWaveform();
 
       // Send stop signal to backend BEFORE closing — backend will process then close

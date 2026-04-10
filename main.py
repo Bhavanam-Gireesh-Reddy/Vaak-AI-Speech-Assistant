@@ -1621,20 +1621,35 @@ async def translate_ws(client_ws: WebSocket):
                             pcm_buffer = pcm_buffer[CHUNK_BYTES:]
                             wav_data   = pcm_to_wav(chunk, SAMPLE_RATE, CHANNELS)
                             encoded    = base64.b64encode(wav_data).decode("utf-8")
-                            await sarvam_ws.transcribe(
-                                audio=encoded, encoding="audio/wav", sample_rate=SAMPLE_RATE,
-                            )
+                            try:
+                                await sarvam_ws.transcribe(
+                                    audio=encoded, encoding="audio/wav", sample_rate=SAMPLE_RATE,
+                                )
+                            except Exception as send_err:
+                                # Sarvam WS closed — exit cleanly, don't propagate
+                                print(f"  [sender] Sarvam send error (WS closed?): {send_err}")
+                                return
                         else:
                             await asyncio.sleep(0.01)
 
                 async def receiver():
-                    async for msg in sarvam_ws:
-                        await process_sarvam_msg(
-                            msg, client_ws, mode,
-                            frag_buf, last_frag_t, all_sentences, session_id, custom_vocabulary, sentiment_timeline
-                        )
+                    nonlocal session_active
+                    try:
+                        async for msg in sarvam_ws:
+                            await process_sarvam_msg(
+                                msg, client_ws, mode,
+                                frag_buf, last_frag_t, all_sentences, session_id, custom_vocabulary, sentiment_timeline
+                            )
+                    except asyncio.CancelledError:
+                        raise  # let gather cancel it normally
+                    except Exception as recv_err:
+                        print(f"  [receiver] Sarvam receive error: {recv_err}")
+                    finally:
+                        # Signal sender + flush_idle to stop when Sarvam closes
+                        session_active = False
 
-                await asyncio.gather(sender(), receiver(), flush_idle())
+                # return_exceptions=True: one task finishing/failing does NOT cancel others
+                await asyncio.gather(sender(), receiver(), flush_idle(), return_exceptions=True)
 
         except WebSocketDisconnect:
             pass
