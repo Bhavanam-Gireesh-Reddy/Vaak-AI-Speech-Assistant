@@ -3,8 +3,6 @@ import "server-only";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { buildBackendUrl } from "@/lib/backend";
-
 const templatesRoot = path.resolve(process.cwd(), "legacy");
 const liveLightThemeOverrides = `
 <style id="next-light-overrides">
@@ -68,15 +66,6 @@ const liveLightThemeOverrides = `
 </style>
 `;
 
-function getBackendWebSocketBase() {
-  const backendUrl = buildBackendUrl("/");
-
-  if (backendUrl.startsWith("https://")) {
-    return backendUrl.replace("https://", "wss://").replace(/\/$/, "");
-  }
-
-  return backendUrl.replace("http://", "ws://").replace(/\/$/, "");
-}
 
 export async function loadLegacyTemplate(name: "index.html") {
   const filePath = path.join(templatesRoot, name);
@@ -84,7 +73,6 @@ export async function loadLegacyTemplate(name: "index.html") {
 }
 
 export async function buildLegacyLiveHtml(authToken: string) {
-  const backendWsBase = getBackendWebSocketBase();
   let html = await loadLegacyTemplate("index.html");
 
   html = html.replace("<head>", `<head><base target="_top">${liveLightThemeOverrides}<script>window.NEXT_PUBLIC_API_URL = ${JSON.stringify(process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000")};</script>`);
