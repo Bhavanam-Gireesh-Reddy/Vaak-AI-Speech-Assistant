@@ -498,6 +498,112 @@ async def chat_with_transcript(
     return (await call_groq(prompt, system, max_tokens=1200)).strip()
 
 
+# ── NEW FEATURES: Action Items, OCR, Search, Folder Organization ──
+
+
+async def extract_action_items(session_doc: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extract action items and tasks from session transcript."""
+    fallback: list[dict[str, Any]] = []
+    if not has_llm_access():
+        return fallback
+
+    system = (
+        "Extract action items, tasks, and assignments from the transcript. "
+        "Return valid JSON only: an array of 5 to 15 objects with keys: "
+        "action (task description), owner (person responsible if mentioned), "
+        "due_date (if mentioned), priority (high/medium/low), status (open)"
+    )
+    prompt = (
+        "Extract all action items and tasks from this meeting transcript.\n\n"
+        f"{build_transcript_context(session_doc)}"
+    )
+    data = await _generate_json(prompt, system, fallback)
+    return data if isinstance(data, list) else fallback
+
+
+async def process_ocr_from_image(image_base64: str, file_type: str = "image/png") -> dict[str, Any]:
+    """Process OCR from uploaded image or handwritten notes."""
+    try:
+        import base64
+        import io
+        from PIL import Image
+        import pytesseract
+    except ImportError:
+        print("  [OCR] ❌ Pytesseract or Pillow not installed")
+        return {"success": False, "error": "OCR not available", "text": ""}
+
+    try:
+        # Decode base64
+        image_data = base64.b64decode(image_base64)
+        image = Image.open(io.BytesIO(image_data))
+        
+        # Perform OCR
+        text = pytesseract.image_to_string(image, lang='eng')
+        
+        # Clean up text
+        cleaned_text = re.sub(r'\s+', ' ', text).strip()
+        
+        return {
+            "success": True,
+            "text": cleaned_text,
+            "confidence": "medium",
+            "file_type": file_type,
+            "character_count": len(cleaned_text)
+        }
+    except Exception as e:
+        print(f"  [OCR] ❌ Error processing image: {e}")
+        return {"success": False, "error": str(e), "text": ""}
+
+
+def search_sessions_by_keyword(sessions: list[dict[str, Any]], keyword: str) -> list[dict[str, Any]]:
+    """Search sessions by keyword across multiple fields."""
+    if not keyword or not keyword.strip():
+        return sessions
+    
+    query = keyword.lower().strip()
+    results = []
+    
+    for session in sessions:
+        # Search across multiple fields
+        searchable_fields = [
+            session.get("title", ""),
+            session.get("transcript", ""),
+            session.get("corrected_transcript", ""),
+            session.get("filtered_transcript", ""),
+            session.get("summary", ""),
+            session.get("notes", ""),
+        ]
+        
+        # Check if keyword appears in any field
+        if any(query in field.lower() for field in searchable_fields if isinstance(field, str)):
+            results.append(session)
+    
+    return results
+
+
+def suggest_folder_for_session(session_doc: dict[str, Any], existing_folders: list[str]) -> str:
+    """Suggest a folder for session based on content."""
+    title = (session_doc.get("title") or "").lower()
+    transcript = (session_doc.get("transcript") or "").lower()[:500]
+    notes = (session_doc.get("notes") or "").lower()
+    
+    # Simple heuristic-based suggestions
+    content = f"{title} {transcript} {notes}"
+    
+    if any(word in content for word in ["meeting", "standup", "sync", "sync-up"]):
+        return "meetings"
+    elif any(word in content for word in ["review", "code review", "pr", "pull request"]):
+        return "code-reviews"
+    elif any(word in content for word in ["training", "onboarding", "learn", "tutorial"]):
+        return "training"
+    elif any(word in content for word in ["brainstorm", "idea", "planning", "sprint"]):
+        return "planning"
+    elif any(word in content for word in ["client", "customer", "stakeholder", "presentation"]):
+        return "client"
+    
+    return "general"
+
+
 def _parse_vtt_to_text(vtt_text: str) -> str:
     lines = []
     for raw_line in vtt_text.splitlines():

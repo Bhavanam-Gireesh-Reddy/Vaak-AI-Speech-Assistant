@@ -17,6 +17,9 @@ import {
   Search,
   Sparkles,
   Video,
+  CheckSquare,
+  Upload,
+  AlertCircle,
 } from "lucide-react";
 import {
   startTransition,
@@ -655,6 +658,68 @@ export function StudioPageClient() {
     URL.revokeObjectURL(url);
   }
 
+  async function generateActionItems() {
+    if (!detail) return;
+    setBusyKey("action_items");
+    setError("");
+    try {
+      const response = await fetch(`/api/sessions/${detail.session_id}/action-items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const payload = await readJson<{ action_items: any[] }>(response);
+      updateDetail({ action_items: payload.action_items ?? [] });
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to extract action items.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  async function handleOCRUpload(file: File | undefined) {
+    if (!file || !detail) return;
+    setBusyKey("ocr");
+    setError("");
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const imageData = (event.target?.result as string).split(",")[1]; // Remove data:image/png;base64, prefix
+        if (!imageData) {
+          setError("Invalid image file.");
+          return;
+        }
+        try {
+          const response = await fetch(`/api/sessions/${detail.session_id}/upload-notes`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              image_data: imageData,
+              file_type: file.type,
+            }),
+          });
+          const payload = await readJson<{ extracted_text: string; character_count: number }>(response);
+          const existingNotes = detail.uploaded_notes ?? [];
+          existingNotes.push({
+            timestamp: new Date().toISOString(),
+            text: payload.extracted_text,
+            file_type: file.type,
+            confidence: "high",
+          });
+          updateDetail({ uploaded_notes: existingNotes });
+        } catch (uploadError) {
+          setError(uploadError instanceof Error ? uploadError.message : "OCR upload failed.");
+        } finally {
+          setBusyKey("");
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "File reading failed.");
+      setBusyKey("");
+    }
+  }
+
   const transcript = detail ? getPrimaryTranscript(detail) : "";
   const translationValue =
     detail && translationTarget !== "same"
@@ -1245,6 +1310,110 @@ export function StudioPageClient() {
                   </div>
                 </div>
               </StudioCard>
+
+              <section className="grid items-stretch gap-5 xl:grid-cols-2">
+                <StudioCard
+                  bodyClassName="h-full"
+                  title="Action Items"
+                  subtitle="Extract tasks and action items from the meeting transcript."
+                  actions={
+                    <ActionButton
+                      busy={busyKey === "action_items"}
+                      onClick={() => void generateActionItems()}
+                    >
+                      <CheckSquare className="h-4 w-4" />
+                      Extract
+                    </ActionButton>
+                  }
+                >
+                  {detail.action_items && detail.action_items.length > 0 ? (
+                    <div className="space-y-3">
+                      {detail.action_items.map((item: any, index: number) => (
+                        <div
+                          key={index}
+                          className="rounded-3xl border border-slate-200 bg-slate-50 p-4"
+                        >
+                          <div className="flex items-start gap-3">
+                            <CheckSquare className="h-5 w-5 flex-shrink-0 text-sky-600 mt-1" />
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-slate-950">{item.action}</p>
+                              {item.owner && (
+                                <p className="text-xs text-slate-500 mt-1">Owner: {item.owner}</p>
+                              )}
+                              {item.due_date && (
+                                <p className="text-xs text-slate-500">Due: {item.due_date}</p>
+                              )}
+                              <div className="mt-2 flex gap-2">
+                                <span
+                                  className={`text-[10px] font-semibold px-2 py-1 rounded-full ${
+                                    item.priority === "high"
+                                      ? "bg-red-100 text-red-700"
+                                      : item.priority === "medium"
+                                        ? "bg-amber-100 text-amber-700"
+                                        : "bg-green-100 text-green-700"
+                                  }`}
+                                >
+                                  {item.priority?.toUpperCase() || "MEDIUM"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
+                      No action items extracted yet. Click Extract to generate.
+                    </div>
+                  )}
+                </StudioCard>
+
+                <StudioCard
+                  bodyClassName="h-full"
+                  title="Handwritten Notes (OCR)"
+                  subtitle="Upload and extract text from handwritten notes or images."
+                >
+                  <div className="space-y-4">
+                    <div
+                      className="border-2 border-dashed border-slate-200 rounded-3xl p-6 text-center hover:bg-slate-50 transition cursor-pointer"
+                      onClick={() => {
+                        const input = document.createElement("input");
+                        input.type = "file";
+                        input.accept = "image/*";
+                        input.onchange = (e: any) => void handleOCRUpload(e.target.files?.[0]);
+                        input.click();
+                      }}
+                    >
+                      <Upload className="h-8 w-8 mx-auto text-slate-400 mb-2" />
+                      <p className="text-sm font-semibold text-slate-700">
+                        Click to upload image
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        PNG, JPG, or PDF up to 10MB
+                      </p>
+                    </div>
+
+                    {detail.uploaded_notes && detail.uploaded_notes.length > 0 && (
+                      <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                        {detail.uploaded_notes.map((note: any, index: number) => (
+                          <div
+                            key={index}
+                            className="rounded-3xl border border-slate-200 bg-slate-50 p-4"
+                          >
+                            <p className="text-xs text-slate-500 mb-2">
+                              {new Date(note.timestamp).toLocaleString()}
+                            </p>
+                            <p className="text-sm text-slate-700 break-words">
+                              {note.text.substring(0, 200)}
+                              {note.text.length > 200 ? "..." : ""}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </StudioCard>
+              </section>
             </>
           )}
         </div>
@@ -1252,3 +1421,4 @@ export function StudioPageClient() {
     </div>
   );
 }
+

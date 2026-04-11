@@ -15,6 +15,19 @@ export type SessionRecord = {
   folder_id?: string;
   share_token?: string;
   is_public?: boolean;
+  action_items?: Array<{
+    action: string;
+    owner?: string;
+    due_date?: string;
+    priority?: "high" | "medium" | "low";
+    status?: string;
+  }>;
+  uploaded_notes?: Array<{
+    timestamp: string;
+    text: string;
+    file_type: string;
+    confidence: string;
+  }>;
   [key: string]: unknown;
 };
 

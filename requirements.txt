@@ -12,5 +12,8 @@ python-dotenv>=1.0.0
 redis>=5.0.0
 yt-dlp>=2025.1.15
 json-repair>=0.45.0
-
 aiohttp
+pytesseract>=0.3.10
+Pillow>=10.0.0
+
+

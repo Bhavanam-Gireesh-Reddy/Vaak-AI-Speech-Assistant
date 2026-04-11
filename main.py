@@ -69,6 +69,7 @@ try:
         apply_custom_vocabulary,
         build_youtube_session,
         chat_with_transcript,
+        extract_action_items,
         generate_flashcards,
         generate_mind_map,
         generate_podcast_script,
@@ -76,6 +77,9 @@ try:
         generate_rich_notes,
         generate_translation,
         normalize_custom_vocabulary,
+        process_ocr_from_image,
+        search_sessions_by_keyword,
+        suggest_folder_for_session,
         summarize_sentiment_timeline,
     )
     AI_FEATURES_AVAILABLE = True
@@ -1637,6 +1641,108 @@ async def process_sarvam_msg(msg, client_ws, mode, frag_buf, last_frag_t, all_se
 
     except Exception as e:
         print(f"process_sarvam_msg error: {e}")
+
+
+
+@app.post("/api/sessions/{session_id}/action-items",
+    summary="Extract action items from session",
+    tags=["AI Features"])
+async def session_action_items(session_id: str, body: dict, request: Request, x_api_key: str = Header(default="")):
+    if not AI_FEATURES_AVAILABLE or not LLM_AVAILABLE:
+        return JSONResponse({"error": "AI features are not available"}, status_code=503)
+    result, error = await get_session_for_user(session_id, request, x_api_key)
+    if error:
+        return error
+    doc, user = result
+    if doc.get("action_items") and not body.get("regenerate"):
+        return JSONResponse({"action_items": doc["action_items"], "cached": True})
+    action_items = await extract_action_items(doc)
+    await db_collection.update_one({"session_id": session_id, "user_id": user.get("sub", "")}, {"$set": {"action_items": action_items}})
+    return JSONResponse({"action_items": action_items, "cached": False})
+
+
+@app.post("/api/sessions/{session_id}/upload-notes",
+    summary="Upload and process handwritten notes with OCR",
+    tags=["AI Features"])
+async def session_upload_notes(session_id: str, body: dict, request: Request, x_api_key: str = Header(default="")):
+    if not AI_FEATURES_AVAILABLE:
+        return JSONResponse({"error": "AI features are not available"}, status_code=503)
+    result, error = await get_session_for_user(session_id, request, x_api_key)
+    if error:
+        return error
+    doc, user = result
+    
+    image_base64 = body.get("image_data", "")
+    file_type = body.get("file_type", "image/png")
+    
+    if not image_base64:
+        return JSONResponse({"error": "No image data provided"}, status_code=400)
+    
+    ocr_result = await process_ocr_from_image(image_base64, file_type)
+    
+    if not ocr_result.get("success"):
+        return JSONResponse({"error": ocr_result.get("error", "OCR processing failed")}, status_code=500)
+    
+    extracted_text = ocr_result.get("text", "")
+    existing_notes = doc.get("uploaded_notes", []) or []
+    existing_notes.append({
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "text": extracted_text,
+        "file_type": file_type,
+        "confidence": ocr_result.get("confidence", "medium")
+    })
+    
+    await db_collection.update_one(
+        {"session_id": session_id, "user_id": user.get("sub", "")},
+        {"$set": {"uploaded_notes": existing_notes}}
+    )
+    
+    return JSONResponse({
+        "success": True,
+        "extracted_text": extracted_text,
+        "character_count": ocr_result.get("character_count", 0),
+        "confidence": ocr_result.get("confidence", "medium")
+    })
+
+
+@app.get("/api/sessions/suggest-folder",
+    summary="Get folder suggestion for session",
+    tags=["Sessions"])
+async def get_folder_suggestion(request: Request, session_id: str = "", x_api_key: str = Header(default="")):
+    if db_collection is None:
+        return JSONResponse({"error": "DB not connected"}, status_code=503)
+    user = await get_authenticated_user(request, x_api_key) if AUTH_AVAILABLE else {"sub": "local"}
+    if AUTH_AVAILABLE and not user:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    
+    if not session_id:
+        return JSONResponse({"error": "session_id required"}, status_code=400)
+    
+    query = {"session_id": session_id}
+    if AUTH_AVAILABLE:
+        query["user_id"] = user["sub"]
+    
+    doc = await db_collection.find_one(query, {"_id": 0})
+    if not doc:
+        return JSONResponse({"error": "Session not found"}, status_code=404)
+    
+    suggested_folder = suggest_folder_for_session(doc, [])
+    return JSONResponse({"suggested_folder": suggested_folder})
+
+
+@app.get("/api/folders",
+    summary="List all folders",
+    tags=["Folders"])
+async def list_folders(request: Request, x_api_key: str = Header(default="")):
+    if db_collection is None:
+        return JSONResponse({"error": "DB not connected"}, status_code=503)
+    user = await get_authenticated_user(request, x_api_key) if AUTH_AVAILABLE else {"sub": "local"}
+    if AUTH_AVAILABLE and not user:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    
+    query = {"user_id": user["sub"]} if AUTH_AVAILABLE else {}
+    cursor = db_collection.find(query, {"_id": 0, "folder_id": 1}).limit(1)
+    return JSONResponse({"message": "Folders endpoint - implement collection-based folders"})
 
 
 if __name__ == "__main__":
