@@ -1108,6 +1108,10 @@
           <input type="file" id="audioFileInput" accept="audio/*" style="display:none"
             onchange="handleAudioUpload(event)" />
         </label>
+        
+        <div class="vol-meter" style="width: 80px; margin: 0 10px;">
+          <div id="volFill" class="vol-fill"></div>
+        </div>
 
         <div class="status-bar">
           <div class="dot idle" id="statusDot"></div>
@@ -1422,18 +1426,22 @@ grok -> Groq"></textarea>
       document.getElementById('startBtn').disabled = true;   // keep disabled until analysis done
       document.getElementById('stopBtn').disabled = true;
       document.getElementById('waveform').classList.remove('active');
-      document.getElementById('volFill').style.width = '0%';
+      
+      const volFill = document.getElementById('volFill');
+      if (volFill) volFill.style.width = '0%';
       partialEl = null;
 
       // Show saved confirmation if DB was connected
       const dbBadge = document.getElementById('dbBadge');
-      if (dbBadge.classList.contains('ok') && segmentCount > 0) {
+      if (dbBadge && dbBadge.classList.contains('ok') && segmentCount > 0) {
         showToast('✓ Session saved to MongoDB', 'ok');
         // Update session counter
         const statDB = document.getElementById('statDB');
         const statCount = document.getElementById('statDBCount');
-        statDB.style.display = 'flex';
-        statCount.textContent = parseInt(statCount.textContent || '0') + 1;
+        if (statDB && statCount) {
+          statDB.style.display = 'flex';
+          statCount.textContent = parseInt(statCount.textContent || '0') + 1;
+        }
       }
     }
 
@@ -1831,18 +1839,19 @@ grok -> Groq"></textarea>
     function setStatus(state, label) {
       const dot = document.getElementById('statusDot');
       const text = document.getElementById('statusText');
-      dot.className = `dot ${state}`;
-      text.textContent = label;
+      if (dot) dot.className = `dot ${state}`;
+      if (text) text.textContent = label;
     }
 
     // ── Toast ──────────────────────────────────────────────────────────────────
     let toastTimer = null;
     function showToast(msg, type = '') {
       const t = document.getElementById('toast');
+      if (!t) return;
       t.textContent = msg;
-      t.className = `toast ${type} show`;
+      t.className = `toast show ${type}`;
       clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+      toastTimer = setTimeout(() => { t.classList.remove('show'); }, 3000);
     }
 
     // ── Utilities ──────────────────────────────────────────────────────────────
@@ -1856,11 +1865,13 @@ grok -> Groq"></textarea>
     }
 
     function updateVolMeter(float32) {
+      const volFill = document.getElementById('volFill');
+      if (!volFill) return;
       let sum = 0;
       for (let i = 0; i < float32.length; i++) sum += float32[i] * float32[i];
       const rms = Math.sqrt(sum / float32.length);
       const pct = Math.min(100, rms * 400);
-      document.getElementById('volFill').style.width = pct + '%';
+      volFill.style.width = pct + '%';
     }
 
     function updateDuration() {
