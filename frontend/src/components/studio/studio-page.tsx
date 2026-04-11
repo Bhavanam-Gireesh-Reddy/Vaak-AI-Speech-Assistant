@@ -884,7 +884,7 @@ export function StudioPageClient() {
                 >
                   <div className="flex h-full min-h-[340px] flex-col gap-4">
                     {detail.speakers?.length ? (
-                      <div className="space-y-3 overflow-y-auto pr-1">
+                      <div className="max-h-[200px] space-y-3 overflow-y-auto pr-1">
                         {detail.speakers.map((speaker, index) => (
                         <div
                           key={`${speaker.speaker ?? "speaker"}-${index}`}
