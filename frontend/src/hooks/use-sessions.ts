@@ -38,8 +38,8 @@ export function useSessions() {
 
     try {
       const [sessionsResponse, foldersResponse] = await Promise.all([
-        fetch("/api/sessions?page=1&limit=100", { cache: "no-store" }),
-        fetch("/api/folders", { cache: "no-store" }),
+        fetch("/api/proxy/v1/sessions?page=1&limit=100", { cache: "no-store" }),
+        fetch("/api/proxy/folders", { cache: "no-store" }),
       ]);
 
       const sessionsPayload = await readJson<SessionsResponse>(sessionsResponse);
@@ -67,7 +67,7 @@ export function useSessions() {
   }, []);
 
   async function deleteSession(sessionId: string) {
-    const response = await fetch(`/api/sessions/${sessionId}`, {
+    const response = await fetch(`/api/proxy/v1/sessions/${sessionId}`, {
       method: "DELETE",
     });
 
@@ -79,7 +79,7 @@ export function useSessions() {
   }
 
   async function translateSession(sessionId: string, targetLang: string) {
-    const response = await fetch(`/api/sessions/${sessionId}/translate`, {
+    const response = await fetch(`/api/proxy/v1/sessions/${sessionId}/translate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -104,7 +104,7 @@ export function useSessions() {
   }
 
   async function assignFolder(sessionId: string, folderId: string) {
-    const response = await fetch(`/api/sessions/${sessionId}/folder`, {
+    const response = await fetch(`/api/proxy/sessions/${sessionId}/folder`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -127,7 +127,7 @@ export function useSessions() {
   }
 
   async function createFolder(name: string, color: string) {
-    const response = await fetch("/api/folders", {
+    const response = await fetch("/api/proxy/folders", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -141,7 +141,7 @@ export function useSessions() {
   }
 
   async function toggleShare(sessionId: string, enable: boolean) {
-    const response = await fetch(`/api/sessions/${sessionId}/share`, {
+    const response = await fetch(`/api/proxy/sessions/${sessionId}/share`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -171,28 +171,6 @@ export function useSessions() {
     return payload.share_url ?? null;
   }
 
-  async function extractActionItems(sessionId: string) {
-    const response = await fetch(`/api/sessions/${sessionId}/action_items`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    interface ActionItem {
-      description: string;
-      assignee: string;
-      deadline: string;
-    }
-    const payload = await readJson<{ action_items: ActionItem[] }>(response);
-    setSessions((current) =>
-      current.map((session) =>
-        session.session_id === sessionId
-          ? { ...session, action_items: payload.action_items }
-          : session,
-      ),
-    );
-    return payload.action_items;
-  }
-
   return {
     sessions,
     folders,
@@ -204,6 +182,5 @@ export function useSessions() {
     assignFolder,
     createFolder,
     toggleShare,
-    extractActionItems,
   };
 }

@@ -10,8 +10,6 @@ import {
   Share2,
   Trash2,
   WandSparkles,
-  ScanText,
-  ImageUp,
 } from "lucide-react";
 import { useDeferredValue, useEffect, useState } from "react";
 
@@ -49,7 +47,6 @@ export function HistoryPage() {
     assignFolder,
     createFolder,
     toggleShare,
-    extractActionItems,
   } = useSessions();
   const [search, setSearch] = useState("");
   const [modeFilter, setModeFilter] = useState("all");
@@ -57,10 +54,6 @@ export function HistoryPage() {
   const [folderFilter, setFolderFilter] = useState("all");
   const [expandedId, setExpandedId] = useState("");
   const [translatingId, setTranslatingId] = useState("");
-  const [extractingId, setExtractingId] = useState("");
-  const [ocrSessionId, setOcrSessionId] = useState("");
-  const [ocrResult, setOcrResult] = useState<{ text: string; summary: string } | null>(null);
-  const [ocrLoading, setOcrLoading] = useState(false);
   const [translationChoice, setTranslationChoice] = useState("en");
   const [toast, setToast] = useState("");
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
@@ -138,16 +131,6 @@ export function HistoryPage() {
     }
   }
 
-  async function handleExtractActionItems(session: SessionRecord) {
-    setExtractingId(session.session_id);
-    try {
-      await extractActionItems(session.session_id);
-      setToast("Action items extracted successfully.");
-    } finally {
-      setExtractingId("");
-    }
-  }
-
   async function handleCreateFolder(session: SessionRecord) {
     const name = window.prompt("Folder name");
 
@@ -192,25 +175,6 @@ export function HistoryPage() {
       `${session.title || "MeetWise AI transcript"}\n\n${(session.summary || getPrimaryTranscript(session)).slice(0, 1400)}`,
     );
     window.open(`https://wa.me/?text=${body}`, "_blank");
-  }
-
-  async function handleOcrUpload(sessionId: string, file: File) {
-    setOcrSessionId(sessionId);
-    setOcrLoading(true);
-    setOcrResult(null);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/ocr", { method: "POST", body: formData });
-      const data = (await res.json()) as { text?: string; summary?: string; error?: string };
-      if (data.error) { setToast("OCR failed: " + data.error); return; }
-      setOcrResult({ text: data.text ?? "", summary: data.summary ?? "" });
-      setToast("Text extracted from image successfully!");
-    } catch {
-      setToast("OCR upload failed.");
-    } finally {
-      setOcrLoading(false);
-    }
   }
 
   return (
@@ -451,14 +415,6 @@ export function HistoryPage() {
                                   ? "Translating..."
                                   : "Translate"}
                               </button>
-                              <button
-                                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 col-span-full sm:col-span-2"
-                                onClick={() => void handleExtractActionItems(session)}
-                                type="button"
-                              >
-                                <WandSparkles className="h-4 w-4" />
-                                {extractingId === session.session_id ? "Extracting Action Items..." : "Extract Action Items"}
-                              </button>
                             </div>
 
                             <div className="grid gap-2 sm:grid-cols-2">
@@ -567,67 +523,6 @@ export function HistoryPage() {
                         </p>
                       </div>
                     ) : null}
-                    {session.action_items && session.action_items.length > 0 ? (
-                      <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 mt-4">
-                        <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">
-                          <WandSparkles className="h-4 w-4" /> Action Items
-                        </div>
-                        <ul className="mt-4 flex flex-col gap-3">
-                          {session.action_items.map((item, i) => (
-                            <li key={i} className="flex flex-col gap-1 rounded-xl border border-emerald-100 bg-white p-4 shadow-sm">
-                              <span className="font-semibold text-slate-800">{item.description}</span>
-                              <div className="flex gap-4 mt-2 text-xs font-medium text-slate-500">
-                                <span className="bg-slate-100 px-2 py-1 rounded-md">Assignee: {item.assignee}</span>
-                                <span className="bg-slate-100 px-2 py-1 rounded-md">Deadline: {item.deadline}</span>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
-
-                    {/* OCR Upload Section */}
-                    <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
-                      <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-amber-700">
-                        <ScanText className="h-4 w-4" />
-                        OCR — Extract Text from Image
-                      </div>
-                      <p className="mt-2 text-xs text-amber-600">Upload a photo of handwritten notes, a whiteboard, or a slide to extract the text automatically.</p>
-                      <div className="mt-4 flex flex-col gap-3">
-                        <label className="flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-dashed border-amber-300 bg-white p-4 transition hover:border-amber-400 hover:bg-amber-50/50">
-                          <ImageUp className="h-5 w-5 text-amber-500 shrink-0" />
-                          <span className="text-sm font-medium text-slate-700">
-                            {ocrLoading && ocrSessionId === session.session_id ? "Analyzing image..." : "Click to upload an image"}
-                          </span>
-                          <input
-                            accept="image/*"
-                            className="hidden"
-                            disabled={ocrLoading}
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) void handleOcrUpload(session.session_id, file);
-                              e.target.value = "";
-                            }}
-                            type="file"
-                          />
-                        </label>
-                        {ocrSessionId === session.session_id && ocrResult ? (
-                          <div className="rounded-2xl border border-amber-200 bg-white p-4 space-y-3">
-                            {ocrResult.summary ? (
-                              <p className="text-xs font-semibold text-amber-700 italic">{ocrResult.summary}</p>
-                            ) : null}
-                            <pre className="whitespace-pre-wrap text-sm leading-7 text-slate-700 font-mono">{ocrResult.text}</pre>
-                            <button
-                              className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-100"
-                              onClick={() => void navigator.clipboard.writeText(ocrResult.text).then(() => setToast("Text copied!"))}
-                              type="button"
-                            >
-                              <Copy className="h-3.5 w-3.5" /> Copy text
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
                   </div>
                 ) : null}
               </article>

@@ -407,11 +407,10 @@ export function StudioPageClient() {
     async function initializeStudio() {
       try {
         const response = await fetch("/api/sessions", { cache: "no-store" });
-        const payload = await readJson<{ sessions: SessionItem[] }>(response);
-        const fetchedSessions = Array.isArray(payload.sessions) ? payload.sessions : [];
-        startTransition(() => setSessions(fetchedSessions));
+        const payload = await readJson<SessionItem[]>(response);
+        startTransition(() => setSessions(Array.isArray(payload) ? payload : []));
 
-        const firstSessionId = fetchedSessions[0]?.session_id;
+        const firstSessionId = payload[0]?.session_id;
         if (!firstSessionId) {
           return;
         }
@@ -444,10 +443,9 @@ export function StudioPageClient() {
   async function loadSessions(preferredId?: string) {
     setError("");
     const response = await fetch("/api/sessions", { cache: "no-store" });
-    const payload = await readJson<{ sessions: SessionItem[] }>(response);
-    const fetchedSessions = Array.isArray(payload.sessions) ? payload.sessions : [];
-    startTransition(() => setSessions(fetchedSessions));
-    const nextId = preferredId ?? selectedId ?? fetchedSessions[0]?.session_id ?? null;
+    const payload = await readJson<SessionItem[]>(response);
+    startTransition(() => setSessions(Array.isArray(payload) ? payload : []));
+    const nextId = preferredId ?? selectedId ?? payload[0]?.session_id ?? null;
     if (nextId) {
       await openSession(nextId);
     }
@@ -668,39 +666,19 @@ export function StudioPageClient() {
   const currentQuiz = quizQuestions[quizIndex];
 
   return (
-    <div className="grid gap-8 overflow-x-hidden pb-8 xl:gap-10">
-      <section className="rounded-[34px] border border-white/70 bg-white/90 p-7 shadow-[0_28px_70px_rgba(15,23,42,0.08)] backdrop-blur lg:p-8">
+    <div className="grid gap-8 overflow-x-hidden pb-8">
+      <section className="rounded-[30px] border border-white/70 bg-white/90 p-7 shadow-[0_28px_70px_rgba(15,23,42,0.08)] backdrop-blur">
         <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
           Studio
         </p>
-        <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-950 lg:text-4xl">
+        <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
           Native AI study workspace
         </h2>
-        <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-          <p className="max-w-4xl text-sm leading-7 text-slate-600">
-            Session browsing, AI generation, transcript chat, translation, and
-            YouTube import now live in one workspace designed for deep review
-            instead of cramped utility screens.
-          </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[420px]">
-            {[
-              ["Translate", "Multi-language output"],
-              ["Study", "Flashcards and quiz"],
-              ["Visualize", "Mind maps and notes"],
-              ["Chat", "Grounded transcript Q&A"],
-            ].map(([label, detail]) => (
-              <div
-                key={label}
-                className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4"
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-sky-700">
-                  {label}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{detail}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+          The Studio route now runs as real Next.js UI with session browsing, AI
+          generation, transcript chat, translation, and YouTube import wired to
+          your existing backend.
+        </p>
       </section>
 
       {error ? (
@@ -709,8 +687,8 @@ export function StudioPageClient() {
         </div>
       ) : null}
 
-      <div className="grid items-start gap-8 xl:grid-cols-[340px_minmax(0,1fr)] 2xl:grid-cols-[360px_minmax(0,1fr)]">
-        <aside className="space-y-5 xl:sticky xl:top-6">
+      <div className="grid items-start gap-8 2xl:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="space-y-5 2xl:sticky 2xl:top-6">
           <StudioCard
             subtitle={youtubeStatus}
             title="YouTube import"
@@ -794,7 +772,7 @@ export function StudioPageClient() {
                 value={search}
               />
             </label>
-              <div className="mt-4 max-h-[calc(100vh-23rem)] space-y-3 overflow-y-auto pr-1">
+            <div className="mt-4 max-h-[calc(100vh-24rem)] space-y-3 overflow-y-auto pr-1">
               {filteredSessions.length ? (
                 filteredSessions.map((session) => (
                   <button
@@ -835,7 +813,7 @@ export function StudioPageClient() {
             </div>
           ) : (
             <>
-              <section className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.9fr)]">
+              <section className="grid items-stretch gap-5 2xl:grid-cols-[minmax(0,1.15fr)_minmax(300px,0.85fr)]">
                 <StudioCard
                   subtitle={
                     detail.source_type === "youtube"
@@ -862,7 +840,7 @@ export function StudioPageClient() {
                   </div>
                 </StudioCard>
 
-                <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 2xl:grid-cols-4">
+                <div className="grid auto-rows-fr gap-4 sm:grid-cols-2">
                   <MetricCard
                     label="Words"
                     value={(detail.word_count ?? 0).toLocaleString()}
@@ -882,13 +860,13 @@ export function StudioPageClient() {
                 </div>
               </section>
 
-              <section className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)]">
+              <section className="grid items-stretch gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.92fr)]">
                 <StudioCard
                   bodyClassName="h-full"
                   className="h-full"
                   title="Summary and notes"
                 >
-                  <pre className="h-full min-h-[360px] whitespace-pre-wrap break-words rounded-3xl border border-slate-200 bg-slate-50 p-5 font-mono text-sm leading-8 text-slate-700">
+                  <pre className="h-full min-h-[340px] whitespace-pre-wrap break-words rounded-3xl border border-slate-200 bg-slate-50 p-5 font-mono text-sm leading-7 text-slate-700">
                     {[
                       detail.summary ? `SUMMARY\n${detail.summary}` : "",
                       detail.notes ? `NOTES\n${detail.notes}` : "",
@@ -904,7 +882,7 @@ export function StudioPageClient() {
                   className="h-full"
                   title="Speakers and sentiment"
                 >
-                  <div className="flex h-full min-h-[360px] flex-col gap-4">
+                  <div className="flex h-full min-h-[340px] flex-col gap-4">
                     {detail.speakers?.length ? (
                       <div className="space-y-3 overflow-y-auto pr-1">
                         {detail.speakers.map((speaker, index) => (

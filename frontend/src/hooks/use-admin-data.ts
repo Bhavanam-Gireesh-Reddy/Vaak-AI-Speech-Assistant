@@ -36,9 +36,9 @@ async function fetchAdminState(enabled: boolean): Promise<AdminState> {
   }
 
   const [statsResponse, usersResponse, webhookResponse] = await Promise.all([
-    fetch("/api/admin/stats", { cache: "no-store" }),
-    fetch("/api/admin/users", { cache: "no-store" }),
-    fetch("/api/webhooks", { cache: "no-store" }),
+    fetch("/api/proxy/admin/stats", { cache: "no-store" }),
+    fetch("/api/proxy/admin/users", { cache: "no-store" }),
+    fetch("/api/proxy/webhooks", { cache: "no-store" }),
   ]);
 
   const stats = await readJson<AdminStats>(statsResponse);
@@ -127,7 +127,7 @@ export function useAdminData(enabled: boolean) {
   }, [enabled]);
 
   async function saveWebhook(url: string) {
-    const response = await fetch("/api/webhooks", {
+    const response = await fetch("/api/proxy/webhooks", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -144,7 +144,7 @@ export function useAdminData(enabled: boolean) {
   }
 
   async function promoteUser(userId: string) {
-    const response = await fetch(`/api/admin/users/${userId}/promote`, {
+    const response = await fetch(`/api/proxy/admin/users/${userId}/promote`, {
       method: "POST",
     });
 
@@ -153,7 +153,7 @@ export function useAdminData(enabled: boolean) {
   }
 
   async function deleteUser(userId: string) {
-    const response = await fetch(`/api/admin/users/${userId}`, {
+    const response = await fetch(`/api/proxy/admin/users/${userId}`, {
       method: "DELETE",
     });
 
@@ -162,7 +162,7 @@ export function useAdminData(enabled: boolean) {
   }
 
   async function requestSelfPromote() {
-    const response = await fetch("/api/auth/promote-self", {
+    const response = await fetch("/api/proxy/auth/promote-self", {
       method: "POST",
     });
 

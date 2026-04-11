@@ -2,7 +2,7 @@ import "server-only";
 
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8000";
 
-export const AUTH_COOKIE_NAME = "auth_token";
+export const AUTH_COOKIE_NAME = "sarvam_auth_token";
 export const AUTH_COOKIE_MAX_AGE = 72 * 7 * 3600;
 
 export function getBackendUrl() {

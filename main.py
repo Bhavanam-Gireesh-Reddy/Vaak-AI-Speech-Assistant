@@ -13,14 +13,7 @@ import re
 from datetime import datetime, timezone
 
 import uvicorn
-try:
-    from deepgram_service import stream_to_deepgram
-    DEEPGRAM_AVAILABLE = True
-except ImportError:
-    DEEPGRAM_AVAILABLE = False
-    print("WARNING: deepgram_service.py not found or deepgram-sdk not installed.")
-
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Depends, Header, UploadFile, File
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Depends, Header
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -84,8 +77,6 @@ try:
         generate_translation,
         normalize_custom_vocabulary,
         summarize_sentiment_timeline,
-        generate_action_items,
-        extract_text_from_image,
     )
     AI_FEATURES_AVAILABLE = True
 except ImportError as e:
@@ -112,7 +103,6 @@ db_client      = None
 db_collection  = None
 users_col      = None
 redis_client   = None
-folders_col    = None
 
 
 def clean_origin(value: str) -> str | None:
@@ -154,7 +144,7 @@ def build_cors_origins() -> list[str]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db_client, db_collection, users_col, redis_client, folders_col
+    global db_client, db_collection, users_col, redis_client
     if LLM_AVAILABLE:
         llm_module.GROQ_API_KEY = GROQ_API_KEY
         llm_module.HEADERS["Authorization"] = f"Bearer {GROQ_API_KEY}"
@@ -166,41 +156,9 @@ async def lifespan(app: FastAPI):
             await db_client.admin.command("ping")
             db_collection = db_client[MONGO_DB][MONGO_COL]
             users_col     = db_client[MONGO_DB][MONGO_COL_USERS]
-            folders_col   = db_client[MONGO_DB]["folders"]
             # Ensure unique index on email
             await users_col.create_index("email", unique=True)
             await users_col.create_index("api_key", unique=True, sparse=True)
-            
-            # Text index for search.
-            # IMPORTANT: language_override must point to a non-existent field so MongoDB
-            # does NOT treat the document's 'language' field (e.g. 'hi-IN') as a text-index
-            # language selector — 'hi-IN' is not a valid MongoDB text-search language and
-            # would cause error code 17262. Using a dummy field makes all docs use 'english'.
-            try:
-                await db_collection.create_index([
-                    ("transcript", "text"),
-                    ("corrected_transcript", "text"),
-                    ("summary", "text"),
-                    ("notes", "text")
-                ], default_language="english", language_override="search_lang_override")
-            except Exception as idx_err:
-                # Index may already exist with old options — drop and recreate
-                print(f"  ⚠️  Text index create failed ({idx_err}), attempting drop+recreate…")
-                try:
-                    await db_collection.drop_index("transcript_text_corrected_transcript_text_summary_text_notes_text")
-                except Exception:
-                    pass
-                try:
-                    await db_collection.create_index([
-                        ("transcript", "text"),
-                        ("corrected_transcript", "text"),
-                        ("summary", "text"),
-                        ("notes", "text")
-                    ], default_language="english", language_override="search_lang_override")
-                    print("  ✅ Text index recreated successfully")
-                except Exception as e2:
-                    print(f"  ⚠️  Text index could not be created: {e2} — search will use regex fallback")
-            
             print(f"✅ MongoDB connected → {MONGO_DB}.{MONGO_COL} + users")
         except Exception as e:
             print(f"❌ MongoDB connection failed: {e}")
@@ -304,49 +262,6 @@ async def health_check():
     )
 
 
-def get_user_pro_status(db_user: dict) -> dict:
-    """
-    Evaluates if a user is PRO based on:
-    1. Admin status (always PRO)
-    2. Paid is_pro status
-    3. 90-day trial window from created_at
-    """
-    if not db_user:
-        return {"is_pro": False, "is_trial": False, "days_left": 0}
-    
-    is_admin = bool(db_user.get("is_admin", False))
-    is_pro_paid = bool(db_user.get("is_pro", False))
-    
-    # Check trial status
-    created_at_str = db_user.get("created_at")
-    is_trial = False
-    days_left = 0
-    
-    if created_at_str:
-        try:
-            created_at = datetime.fromisoformat(created_at_str)
-            # Ensure timezone awareness if needed
-            if created_at.tzinfo is None:
-                created_at = created_at.replace(tzinfo=timezone.utc)
-            
-            now = datetime.now(timezone.utc)
-            elapsed = (now - created_at).days
-            if elapsed < 90:
-                is_trial = True
-                days_left = 90 - elapsed
-        except Exception as e:
-            print(f"Error parsing created_at for user {db_user.get('email')}: {e}")
-
-    effective_pro = is_admin or is_pro_paid or is_trial
-    
-    return {
-        "is_pro": effective_pro,
-        "is_trial": is_trial and not (is_admin or is_pro_paid), # Only trial if not already Pro/Admin
-        "days_left": days_left if is_trial else 0,
-        "is_admin": is_admin
-    }
-
-
 # ── Auth page routes ──────────────────────────────────────────────────────────
 @app.get("/login")
 async def login_page(request: Request):
@@ -391,7 +306,6 @@ async def register(body: dict):
         "password_hash": hash_password(password),
         "api_key":       api_key,
         "is_admin":      is_first,
-        "is_pro":        is_first,
         "created_at":    datetime.now(timezone.utc).isoformat(),
     })
     if is_first:
@@ -540,17 +454,11 @@ async def me(request: Request):
     db_user = await users_col.find_one({"user_id": user["sub"]})
     if not db_user:
         return JSONResponse({"error": "User not found"}, status_code=404)
-    
-    status = get_user_pro_status(db_user)
-    
     return JSONResponse({
         "user_id": db_user["user_id"],
         "email": db_user["email"],
         "name": db_user.get("name", ""),
-        "is_admin": status["is_admin"],
-        "is_pro": status["is_pro"],
-        "is_trial": status["is_trial"],
-        "days_left": status["days_left"]
+        "is_admin": bool(db_user.get("is_admin", False))
     })
 
 
@@ -568,71 +476,6 @@ async def history(request: Request):
     return frontend_redirect("/history")
 
 
-
-@app.get("/api/folders")
-async def get_folders(request: Request, x_api_key: str = Header(default="")):
-    if folders_col is None:
-        return JSONResponse({"error": "MongoDB not connected"}, status_code=503)
-    user = await get_authenticated_user(request, x_api_key)
-    if not user:
-        return JSONResponse({"error": "Unauthorized"}, status_code=401)
-    cursor = folders_col.find({"user_id": user["sub"]}, {"_id": 0}).sort("created_at", 1)
-    folders = await cursor.to_list(length=100)
-    return JSONResponse(folders)
-
-@app.post("/api/folders")
-async def create_folder(body: dict, request: Request, x_api_key: str = Header(default="")):
-    if folders_col is None:
-        return JSONResponse({"error": "MongoDB not connected"}, status_code=503)
-    user = await get_authenticated_user(request, x_api_key)
-    if not user:
-        return JSONResponse({"error": "Unauthorized"}, status_code=401)
-    name = (body.get("name") or "").strip()
-    color = (body.get("color") or "#cbd5e1").strip()
-    if not name:
-        return JSONResponse({"error": "Name required"}, status_code=400)
-    import secrets
-    folder_id = secrets.token_hex(8)
-    doc = {
-        "folder_id": folder_id,
-        "name": name,
-        "color": color,
-        "user_id": user["sub"],
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await folders_col.insert_one(doc)
-    doc.pop("_id", None)
-    return JSONResponse(doc)
-
-@app.patch("/api/sessions/{session_id}/folder")
-async def assign_session_folder(session_id: str, body: dict, request: Request, x_api_key: str = Header(default="")):
-    if db_collection is None:
-        return JSONResponse({"error": "MongoDB not connected"}, status_code=503)
-    user = await get_authenticated_user(request, x_api_key)
-    if not user:
-        return JSONResponse({"error": "Unauthorized"}, status_code=401)
-    folder_id = body.get("folder_id")
-    update_data = {"folder_id": folder_id} if folder_id else {"folder_id": None}
-    await db_collection.update_one({"session_id": session_id, "user_id": user.get("sub", "")}, {"$set": update_data})
-    return JSONResponse({"ok": True})
-
-
-@app.post("/api/ocr")
-async def ocr_image(request: Request, x_api_key: str = Header(default=""), file: UploadFile = File(...)):
-    """Extract text from an uploaded image using Groq Vision LLM."""
-    user = await get_authenticated_user(request, x_api_key)
-    if not user:
-        return JSONResponse({"error": "Unauthorized"}, status_code=401)
-    if not AI_FEATURES_AVAILABLE:
-        return JSONResponse({"error": "AI features not available."}, status_code=503)
-    contents = await file.read()
-    mime = file.content_type or "image/jpeg"
-    result = await extract_text_from_image(contents, mime)
-    if result.get("error"):
-        return JSONResponse({"error": result["error"]}, status_code=500)
-    return JSONResponse({"text": result["text"], "summary": result["summary"]})
-
-
 @app.get("/api/sessions")
 async def get_sessions(request: Request):
     if db_collection is None:
@@ -640,7 +483,7 @@ async def get_sessions(request: Request):
     query  = build_user_query(request, {})
     cursor = db_collection.find(query, {"_id": 0}).sort("started_at", -1).limit(50)
     sessions = await cursor.to_list(length=50)
-    return JSONResponse({"sessions": sessions})
+    return JSONResponse(sessions)
 
 
 @app.get("/api/search")
@@ -651,22 +494,15 @@ async def search_sessions(request: Request, q: str = "", field: str = "all"):
     base_query = build_user_query(request, {})
     if not q.strip():
         cursor = db_collection.find(base_query, {"_id": 0}).sort("started_at", -1).limit(100)
-        sessions = await cursor.to_list(length=100)
-        return JSONResponse({"sessions": sessions})
-    if field == "all":
-        text_query = {"$text": {"$search": q}}
-        sort_opts = [("score", {"$meta": "textScore"}), ("started_at", -1)]
-        projection = {"_id": 0, "score": {"$meta": "textScore"}}
-    else:
-        pattern = {"$regex": q, "$options": "i"}
-        text_query = {field: pattern}
-        sort_opts = [("started_at", -1)]
-        projection = {"_id": 0}
-
+        return JSONResponse(await cursor.to_list(length=100))
+    pattern = {"$regex": q, "$options": "i"}
+    text_query = {"$or": [
+        {"transcript": pattern}, {"corrected_transcript": pattern},
+        {"filtered_transcript": pattern}, {"summary": pattern},
+    ]} if field == "all" else {field: pattern}
     query  = {"$and": [base_query, text_query]} if base_query else text_query
-    cursor = db_collection.find(query, projection).sort(sort_opts).limit(100)
-    sessions = await cursor.to_list(length=100)
-    return JSONResponse({"sessions": sessions})
+    cursor = db_collection.find(query, {"_id": 0}).sort("started_at", -1).limit(100)
+    return JSONResponse(await cursor.to_list(length=100))
 
 
 @app.get("/api/stats")
@@ -802,21 +638,6 @@ async def session_mindmap(session_id: str, body: dict, request: Request, x_api_k
     return JSONResponse({"mind_map": mind_map, "cached": False})
 
 
-@app.post("/api/sessions/{session_id}/action_items")
-async def session_action_items(session_id: str, body: dict, request: Request, x_api_key: str = Header(default="")):
-    if not AI_FEATURES_AVAILABLE or not LLM_AVAILABLE:
-        return JSONResponse({"error": "AI features are not available"}, status_code=503)
-    result, error = await get_session_for_user(session_id, request, x_api_key)
-    if error:
-        return error
-    doc, user = result
-    if doc.get("action_items") and not body.get("regenerate"):
-        return JSONResponse({"action_items": doc["action_items"], "cached": True})
-    action_items = await generate_action_items(doc)
-    await db_collection.update_one({"session_id": session_id, "user_id": user.get("sub", "")}, {"$set": {"action_items": action_items}})
-    return JSONResponse({"action_items": action_items, "cached": False})
-
-
 @app.post("/api/sessions/{session_id}/rich_notes")
 async def session_rich_notes(session_id: str, body: dict, request: Request, x_api_key: str = Header(default="")):
     if not AI_FEATURES_AVAILABLE or not LLM_AVAILABLE:
@@ -933,36 +754,6 @@ def build_paragraphs(sentences: list, size: int = 5) -> str:
         para = " ".join(s.strip() for s in sentences[i:i + size])
         paras.append(para)
     return "\n\n".join(paras)
-
-
-def normalize_deepgram_language(language_code: str) -> str | None:
-    """
-    Deepgram language support differs from Sarvam's language_code values.
-    Use a known-good explicit language when possible and otherwise let
-    Deepgram choose its default behavior.
-    """
-    code = (language_code or "").strip().lower()
-    if code.startswith("en"):
-        return "en-IN"
-    return None
-
-
-def merge_speaker_turns(existing_turns: list[dict], speaker: str, text: str, limit: int = 12) -> list[dict]:
-    cleaned_text = re.sub(r"\s+", " ", (text or "").strip())
-    cleaned_speaker = (speaker or "unknown").strip() or "unknown"
-    if not cleaned_text:
-        return list(existing_turns)
-
-    next_turns = list(existing_turns)
-    if next_turns and next_turns[-1].get("speaker") == cleaned_speaker:
-        previous = str(next_turns[-1].get("text") or "").strip()
-        if previous and cleaned_text.lower() in previous.lower():
-            return next_turns
-        next_turns[-1]["text"] = f"{previous} {cleaned_text}".strip()
-    else:
-        next_turns.append({"speaker": cleaned_speaker, "text": cleaned_text})
-
-    return next_turns[-limit:]
 
 def pcm_to_wav(pcm_data: bytes, sample_rate: int, channels: int) -> bytes:
     buf = io.BytesIO()
@@ -1489,122 +1280,19 @@ async def broadcast_event(session_id: str, client_ws: WebSocket, message: dict):
         pass
 
 
-
 # ── WebSocket ─────────────────────────────────────────────────────────────────
-@app.websocket("/ws/diarize")
-async def diarize_ws(client_ws: WebSocket):
-    """Real-time speaker diarization via Deepgram."""
-    await client_ws.accept()
-    if not DEEPGRAM_AVAILABLE:
-        await client_ws.send_json({"type": "error", "message": "Deepgram service not available."})
-        await client_ws.close()
-        return
-
-    # ── Pro & Admin Check ──
-    is_pro = False
-    ws_user_id = ""
-    if AUTH_AVAILABLE:
-        token = client_ws.query_params.get("token") or client_ws.cookies.get("auth_token")
-        if token:
-            payload = decode_token(token)
-            if payload:
-                ws_user_id = payload.get("sub", "")
-                if users_col:
-                    db_user = await users_col.find_one({"user_id": ws_user_id})
-                    if db_user:
-                        status = get_user_pro_status(db_user)
-                        is_pro = status["is_pro"]
-
-    # Allow when auth is disabled (self-hosted / local dev)
-    if not AUTH_AVAILABLE:
-        is_pro = True
-        ws_user_id = "local"
-
-    if not is_pro and ws_user_id != "local":
-        await client_ws.send_json({"type": "error", "message": "Speaker ID is a Pro feature. Please upgrade to unlock."})
-        await client_ws.close()
-        return
-
-    # ── Send ready signal so the UI updates from 'Connecting...' → 'Ready' ──
-    try:
-        await client_ws.send_json({
-            "type": "ready",
-            "message": "Deepgram connected — Speaker ID active",
-        })
-    except Exception:
-        pass
-
-    start_time_limit = datetime.now(timezone.utc)
-
-    async def audio_generator():
-        try:
-            while True:
-                # ── 5 Minute Limit for Free Users ──
-                if not is_pro and ws_user_id != "local":
-                    elapsed = (datetime.now(timezone.utc) - start_time_limit).total_seconds()
-                    if elapsed > 300: # 5 minutes
-                        await client_ws.send_json({"type": "error", "message": "Free 5-minute limit reached. Upgrade to Pro for unlimited recordings."})
-                        break
-
-                msg = await client_ws.receive()
-                if msg["type"] == "websocket.receive":
-                    if "bytes" in msg and msg["bytes"]:
-                        yield msg["bytes"]
-                    elif "text" in msg and msg["text"]:
-                        data = json.loads(msg["text"])
-                        if data.get("action") == "stop":
-                            break
-        except Exception:
-            pass
-
-    try:
-        async for result in stream_to_deepgram(audio_generator()):
-            if "error" in result:
-                await client_ws.send_json({"type": "error", "message": result["error"]})
-                break
-            await client_ws.send_json({
-                "type": "transcript",
-                "text": result["text"],
-                "speaker": result["speaker"],
-                "is_final": result["is_final"],
-            })
-    except Exception as e:
-        try:
-            await client_ws.send_json({"type": "error", "message": str(e)})
-        except Exception:
-            pass
-    finally:
-        try:
-            await client_ws.close()
-        except Exception:
-            pass
-
-
 @app.websocket("/ws/translate")
 async def translate_ws(client_ws: WebSocket):
     await client_ws.accept()
     # Identify user from cookie if auth enabled
     ws_user_id = ""
-    is_pro = False
     if AUTH_AVAILABLE:
-        # Try query param first
+        # Try query param first (browsers don't send cookies over WebSocket on HTTPS)
         token = client_ws.query_params.get("token") or client_ws.cookies.get("auth_token")
         if token:
             payload = decode_token(token)
             if payload:
                 ws_user_id = payload.get("sub", "")
-                if users_col:
-                    db_user = await users_col.find_one({"user_id": ws_user_id})
-                    if db_user:
-                        status = get_user_pro_status(db_user)
-                        is_pro = status["is_pro"]
-
-    # Allow when auth is disabled (self-hosted / local dev)
-    if not AUTH_AVAILABLE:
-        is_pro = True
-        ws_user_id = "local"
-
-    start_time_limit = datetime.now(timezone.utc)
 
     try:
         settings_raw = await asyncio.wait_for(client_ws.receive_text(), timeout=10)
@@ -1617,15 +1305,7 @@ async def translate_ws(client_ws: WebSocket):
     mode          = settings.get("mode", "transcribe")
     language_code = settings.get("language", "hi-IN")
     target_lang   = settings.get("target_lang", "same")
-    diarize_requested = bool(settings.get("diarize_enabled"))
     custom_vocabulary = normalize_custom_vocabulary(settings.get("custom_vocabulary", [])) if AI_FEATURES_AVAILABLE else []
-    diarize_active = bool(diarize_requested and DEEPGRAM_AVAILABLE and (is_pro or ws_user_id == "local"))
-    deepgram_language = normalize_deepgram_language(language_code)
-
-    print(
-        f"[translate_ws] mode={mode} lang={language_code} target={target_lang} "
-        f"user={ws_user_id} pro={is_pro} diarize={diarize_active}"
-    )
 
     if not SARVAM_AVAILABLE:
         await client_ws.send_json({"type": "error", "message": "sarvamai not installed."})
@@ -1637,17 +1317,6 @@ async def translate_ws(client_ws: WebSocket):
         await client_ws.close()
         return
 
-    # ── Send early 'connecting' status so Stop button is enabled while Sarvam connects ──
-    try:
-        await client_ws.send_json({
-            "type": "ready",
-            "message": "Connecting to Sarvam AI…" + (" Speaker ID enabled." if diarize_active else ""),
-            "session_id": None,
-            "db": "connected" if db_collection is not None else "disconnected",
-        })
-    except Exception:
-        pass
-
     session_id     = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
     started_at     = datetime.now(timezone.utc)
     all_sentences  = []
@@ -1656,19 +1325,10 @@ async def translate_ws(client_ws: WebSocket):
     last_frag_t    = [0.0]
     pcm_buffer     = bytearray()
     session_active = True
-    live_speaker_turns = []
-    deepgram_audio_queue = asyncio.Queue() if diarize_active else None
-    deepgram_audio_closed = False
 
     print(f"[Session] {session_id} started | mode={mode} lang={language_code}")
 
     sarvam_client = AsyncSarvamAI(api_subscription_key=SARVAM_API_KEY)
-
-    async def close_deepgram_audio_stream():
-        nonlocal deepgram_audio_closed
-        if deepgram_audio_queue is not None and not deepgram_audio_closed:
-            deepgram_audio_closed = True
-            await deepgram_audio_queue.put(None)
 
     # ── Flush idle fragments ──────────────────────────────────────────────────
     async def flush_idle():
@@ -1707,8 +1367,7 @@ async def translate_ws(client_ws: WebSocket):
                 vad_signals=True,
             ) as sarvam_ws:
                 await broadcast_event(session_id, client_ws, {
-                    "type": "ready",
-                    "message": "Sarvam AI connected" + (" — Speaker ID active" if diarize_active else ""),
+                    "type": "ready", "message": "Sarvam AI connected",
                     "session_id": session_id,
                     "db": "connected" if db_collection is not None else "disconnected",
                 })
@@ -1721,35 +1380,20 @@ async def translate_ws(client_ws: WebSocket):
                             pcm_buffer = pcm_buffer[CHUNK_BYTES:]
                             wav_data   = pcm_to_wav(chunk, SAMPLE_RATE, CHANNELS)
                             encoded    = base64.b64encode(wav_data).decode("utf-8")
-                            try:
-                                await sarvam_ws.transcribe(
-                                    audio=encoded, encoding="audio/wav", sample_rate=SAMPLE_RATE,
-                                )
-                            except Exception as send_err:
-                                # Sarvam WS closed — exit cleanly, don't propagate
-                                print(f"  [sender] Sarvam send error (WS closed?): {send_err}")
-                                return
+                            await sarvam_ws.transcribe(
+                                audio=encoded, encoding="audio/wav", sample_rate=SAMPLE_RATE,
+                            )
                         else:
                             await asyncio.sleep(0.01)
 
                 async def receiver():
-                    nonlocal session_active
-                    try:
-                        async for msg in sarvam_ws:
-                            await process_sarvam_msg(
-                                msg, client_ws, mode,
-                                frag_buf, last_frag_t, all_sentences, session_id, custom_vocabulary, sentiment_timeline
-                            )
-                    except asyncio.CancelledError:
-                        raise  # let gather cancel it normally
-                    except Exception as recv_err:
-                        print(f"  [receiver] Sarvam receive error: {recv_err}")
-                    finally:
-                        # Signal sender + flush_idle to stop when Sarvam closes
-                        session_active = False
+                    async for msg in sarvam_ws:
+                        await process_sarvam_msg(
+                            msg, client_ws, mode,
+                            frag_buf, last_frag_t, all_sentences, session_id, custom_vocabulary, sentiment_timeline
+                        )
 
-                # return_exceptions=True: one task finishing/failing does NOT cancel others
-                await asyncio.gather(sender(), receiver(), flush_idle(), return_exceptions=True)
+                await asyncio.gather(sender(), receiver(), flush_idle())
 
         except WebSocketDisconnect:
             pass
@@ -1760,99 +1404,27 @@ async def translate_ws(client_ws: WebSocket):
             except Exception:
                 pass
 
-    async def deepgram_audio_generator():
-        if deepgram_audio_queue is None:
-            return
-        while True:
-            chunk = await deepgram_audio_queue.get()
-            if chunk is None:
-                break
-            yield chunk
-
-    async def diarization_session():
-        nonlocal live_speaker_turns
-        if deepgram_audio_queue is None:
-            return
-
-        try:
-            async for result in stream_to_deepgram(
-                deepgram_audio_generator(),
-                language=deepgram_language,
-            ):
-                if "error" in result:
-                    print(f"Deepgram sidecar error: {result['error']}")
-                    await broadcast_event(session_id, client_ws, {
-                        "type": "speaker_status",
-                        "active": False,
-                        "message": result["error"],
-                    })
-                    return
-
-                if not result.get("is_final"):
-                    continue
-
-                speaker_label = str(result.get("speaker") or "unknown").strip() or "unknown"
-                display_speaker = (
-                    speaker_label.replace("speaker_", "Speaker ")
-                    if speaker_label.startswith("speaker_")
-                    else speaker_label.title()
-                )
-                live_speaker_turns = merge_speaker_turns(
-                    live_speaker_turns,
-                    display_speaker,
-                    str(result.get("text") or ""),
-                )
-                await broadcast_event(session_id, client_ws, {
-                    "type": "speaker_update",
-                    "speakers": live_speaker_turns,
-                })
-        except asyncio.CancelledError:
-            raise
-        except Exception as e:
-            print(f"Deepgram diarization session error: {e}")
-            try:
-                await broadcast_event(session_id, client_ws, {
-                    "type": "speaker_status",
-                    "active": False,
-                    "message": str(e),
-                })
-            except Exception:
-                pass
-
     # ── Audio + control receiver ──────────────────────────────────────────────
     async def audio_receiver():
         nonlocal pcm_buffer, session_active
         try:
             while True:
-                # ── 5 Minute Limit for Free Users ──
-                if not is_pro and ws_user_id != "local":
-                    elapsed = (datetime.now(timezone.utc) - start_time_limit).total_seconds()
-                    if elapsed > 300: # 5 minutes
-                        await client_ws.send_json({"type": "error", "message": "Free 5-minute limit reached. Upgrade to Pro for unlimited recordings."})
-                        session_active = False
-                        break
-
                 # Receive either bytes (audio) or text (control like "stop")
                 msg = await client_ws.receive()
                 if msg["type"] == "websocket.receive":
                     if "bytes" in msg and msg["bytes"]:
                         pcm_buffer.extend(msg["bytes"])
-                        if deepgram_audio_queue is not None:
-                            await deepgram_audio_queue.put(bytes(msg["bytes"]))
                     elif "text" in msg and msg["text"]:
                         data = json.loads(msg["text"])
                         if data.get("action") == "stop":
                             print(f"  [Control] Stop received from browser")
                             session_active = False
-                            await close_deepgram_audio_stream()
                             return   # exit cleanly — triggers finally in gather
         except WebSocketDisconnect:
             session_active = False
-            await close_deepgram_audio_stream()
         except Exception as e:
             print(f"  [audio_receiver] {e}")
             session_active = False
-            await close_deepgram_audio_stream()
 
     # ── Redis Subscriber ──────────────────────────────────────────────────────
     async def redis_subscriber():
@@ -1875,11 +1447,6 @@ async def translate_ws(client_ws: WebSocket):
                 await pubsub.close()
 
     subscriber_task = asyncio.create_task(redis_subscriber(), name="redis_sub")
-    diarization_task = (
-        asyncio.create_task(diarization_session(), name="deepgram_diarize")
-        if diarize_active
-        else None
-    )
 
     # Run all tasks — cancel all when any one finishes (stop signal or disconnect)
     tasks = [
@@ -1898,20 +1465,6 @@ async def translate_ws(client_ws: WebSocket):
                 pass
     except Exception as e:
         print(f"[Session] task error: {e}")
-    finally:
-        await close_deepgram_audio_stream()
-
-    if diarization_task is not None:
-        try:
-            await asyncio.wait_for(diarization_task, timeout=3)
-        except asyncio.TimeoutError:
-            diarization_task.cancel()
-            try:
-                await diarization_task
-            except asyncio.CancelledError:
-                pass
-        except Exception as e:
-            print(f"Deepgram sidecar shutdown error: {e}")
 
     # ── Flush remaining fragment ──────────────────────────────────────────────
     if frag_buf:
@@ -1945,25 +1498,16 @@ async def translate_ws(client_ws: WebSocket):
 
         # 2. Send analysis results to browser while connection is open
         try:
-            # Payload restriction for non-pro users
-            display_summary = result.get("summary", "")
-            display_notes = result.get("notes", "")
-            session_speakers = result.get("speakers") or live_speaker_turns
-            
-            if not is_pro and ws_user_id != "local":
-                display_summary = "Upgrade to PRO to unlock AI summaries of your meetings."
-                display_notes = "Upgrade to PRO to unlock detailed action items and notes."
-
             await broadcast_event(session_id, client_ws, {
                 "type":                "session_analysis",
-                "summary":             display_summary,
-                "notes":               display_notes,
+                "summary":             result.get("summary", ""),
+                "notes":               result.get("notes", ""),
                 "filtered_transcript": result.get("filtered_transcript", ""),
                 "corrected_transcript":result.get("corrected_transcript", ""),
                 "title":               result.get("title", ""),
-                "speakers":            session_speakers,
+                "speakers":            result.get("speakers", []),
             })
-            print(f"  [LLM] Sent (Pro:{is_pro}) → title:'{result.get('title','')}'")
+            print(f"  [LLM] Sent → title:'{result.get('title','')}' summary:{len(result.get('summary',''))} chars notes:{len(result.get('notes',''))} chars")
         except Exception as e:
             print(f"  [LLM] Send error: {e}")
 
@@ -1979,12 +1523,10 @@ async def translate_ws(client_ws: WebSocket):
             final_title,
             result.get("notes", ""),
             ws_user_id,
-            result.get("speakers") or live_speaker_turns,
+            result.get("speakers", []),
             extra_fields={
                 "target_lang": target_lang,
-                "diarize_enabled": diarize_active,
                 "custom_vocabulary": custom_vocabulary,
-                "deepgram_speakers": live_speaker_turns,
                 "sentiment_timeline": sentiment_timeline,
                 "sentiment_summary": summarize_sentiment_timeline(sentiment_timeline) if AI_FEATURES_AVAILABLE else {},
             },

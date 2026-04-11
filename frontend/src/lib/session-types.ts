@@ -10,7 +10,6 @@ export type SessionRecord = {
   filtered_transcript?: string;
   summary?: string;
   notes?: string;
-  action_items?: { description: string; assignee: string; deadline: string }[];
   word_count?: number;
   sentence_count?: number;
   folder_id?: string;

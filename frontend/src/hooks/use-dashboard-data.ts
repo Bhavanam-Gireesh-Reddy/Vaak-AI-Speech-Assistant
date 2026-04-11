@@ -35,8 +35,8 @@ export function useDashboardData() {
     async function load() {
       try {
         const [statsResponse, sessionsResponse] = await Promise.all([
-          fetch("/api/stats", { cache: "no-store" }),
-          fetch("/api/sessions?page=1&limit=8", { cache: "no-store" }),
+          fetch("/api/proxy/v1/stats", { cache: "no-store" }),
+          fetch("/api/proxy/v1/sessions?page=1&limit=8", { cache: "no-store" }),
         ]);
 
         const stats = await readJson<SessionRecord[]>(statsResponse);

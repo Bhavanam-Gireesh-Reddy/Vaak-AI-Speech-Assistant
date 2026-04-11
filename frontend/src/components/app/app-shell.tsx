@@ -13,8 +13,8 @@ type AppShellProps = {
 export function AppShell({ children, user }: AppShellProps) {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f8fbff_0%,#f1f5f9_100%)]">
-      <div className="mx-auto flex min-h-screen max-w-[1800px] flex-col gap-6 px-5 py-5 lg:flex-row lg:px-7 xl:gap-8 xl:px-8">
-        <aside className="flex w-full flex-col rounded-[28px] border border-white/70 bg-white/85 p-6 shadow-[0_30px_70px_rgba(15,23,42,0.08)] backdrop-blur lg:sticky lg:top-5 lg:min-h-[calc(100vh-2.5rem)] lg:w-[272px] xl:w-[292px]">
+      <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-6 py-6 lg:flex-row lg:px-8">
+        <aside className="flex w-full flex-col rounded-[28px] border border-white/70 bg-white/85 p-6 shadow-[0_30px_70px_rgba(15,23,42,0.08)] backdrop-blur lg:min-h-[calc(100vh-3rem)] lg:w-[290px]">
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-white">
               <Sparkles className="h-5 w-5" />
@@ -39,7 +39,7 @@ export function AppShell({ children, user }: AppShellProps) {
           </div>
         </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-6 xl:gap-8">
+        <div className="flex flex-1 flex-col gap-6">
           <main>{children}</main>
         </div>
       </div>

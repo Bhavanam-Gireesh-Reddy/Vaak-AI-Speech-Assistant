@@ -217,22 +217,6 @@ async def _generate_json(prompt: str, system: str, fallback: Any) -> Any:
         return fallback
 
 
-async def generate_action_items(session_doc: dict[str, Any]) -> list[dict[str, Any]]:
-    fallback = []
-    system = (
-        "You analyze meeting transcripts and extract all actionable items, tasks, and follow-ups. "
-        "Return valid JSON only: an array of objects with keys: "
-        "'description' (the task in detail), 'assignee' (who is responsible, or 'Unassigned' if unclear), "
-        "'deadline' (if mentioned, otherwise 'None')."
-    )
-    prompt = (
-        "Extract action items from this transcript context.\n\n"
-        f"{build_transcript_context(session_doc)}"
-    )
-    data = await _generate_json(prompt, system, fallback)
-    return data if isinstance(data, list) else fallback
-
-
 async def generate_flashcards(session_doc: dict[str, Any]) -> list[dict[str, str]]:
     fallback = []
     system = (
@@ -689,57 +673,3 @@ async def generate_translation(session_doc: dict[str, Any], target_lang: str) ->
         return session_doc.get("corrected_transcript") or session_doc.get("transcript") or ""
     text = session_doc.get("corrected_transcript") or session_doc.get("filtered_transcript") or session_doc.get("transcript") or ""
     return await translate_transcript(text, target_lang)
-
-async def extract_text_from_image(image_bytes: bytes, mime_type: str = "image/jpeg") -> dict:
-    # Uses Groq Vision LLM to extract text from images (whiteboard, handwritten notes, slides).
-    import httpx
-
-    groq_key = os.getenv("GROQ_API_KEY", "")
-    if not groq_key or groq_key == "YOUR_GROQ_API_KEY_HERE":
-        return {"error": "GROQ_API_KEY is not configured.", "text": "", "summary": ""}
-
-    b64 = base64.b64encode(image_bytes).decode("utf-8")
-    data_url = f"data:{mime_type};base64,{b64}"
-
-    payload = {
-        "model": "llama-3.2-90b-vision-preview",
-        "messages": [{
-            "role": "user",
-            "content": [
-                {"type": "image_url", "image_url": {"url": data_url}},
-                {
-                    "type": "text",
-                    "text": (
-                        "You are an expert OCR assistant. Look at this image carefully.\n"
-                        "1. Extract ALL visible text exactly as written, preserving line breaks.\n"
-                        "2. Write a 1-2 sentence summary of what the content is about.\n\n"
-                        'Respond ONLY in this JSON format:\n{"text": "...extracted text...", "summary": "...brief summary..."}'
-                    ),
-                },
-            ],
-        }],
-        "max_tokens": 2048,
-        "temperature": 0.1,
-    }
-
-    headers = {
-        "Authorization": f"Bearer {groq_key}",
-        "Content-Type": "application/json",
-    }
-    try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                json=payload,
-                headers=headers,
-            )
-            resp.raise_for_status()
-            llm_content = resp.json()["choices"][0]["message"]["content"].strip()
-            clean = re.sub(r"^\\json\s*|\\$", "", llm_content, flags=re.MULTILINE).strip()
-            try:
-                result = json.loads(clean)
-                return {"text": result.get("text", ""), "summary": result.get("summary", ""), "error": None}
-            except (json.JSONDecodeError, KeyError):
-                return {"text": llm_content, "summary": "", "error": None}
-    except Exception as e:
-        return {"text": "", "summary": "", "error": str(e)}
