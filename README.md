@@ -126,6 +126,38 @@ Sarvam/
 | `REDIS_URI` | `redis://localhost:6379` | Redis connection for WebSocket Pub/Sub scaling |
 | `SECRET_KEY` | *(required)* | JWT signing key (min 32 chars, change in production) |
 
+### Optional: OCR Setup (for Handwritten Notes)
+
+The OCR feature supports **two methods** for extracting text from handwritten notes and images:
+
+#### Option 1: Tesseract OCR (System-installed, high accuracy)
+Install system-wide for best performance:
+
+**Windows:**
+```bash
+# Download installer from: https://github.com/UB-Mannheim/tesseract/wiki
+# Or use Chocolatey:
+choco install tesseract
+```
+
+**macOS:**
+```bash
+brew install tesseract
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt-get install tesseract-ocr
+```
+
+#### Option 2: EasyOCR (pip-installable, recommended for cloud)
+Pre-installed in `requirements.txt`. Downloads model (~100MB) on first use:
+```bash
+pip install easyocr
+```
+
+**Note:** If neither is available, the app provides helpful error messages with setup instructions directly in the UI.
+
 ### Get API Keys
 
 1. **Sarvam AI** → https://sarvam.ai (sign up for API access)

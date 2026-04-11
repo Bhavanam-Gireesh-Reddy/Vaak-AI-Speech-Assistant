@@ -1676,12 +1676,18 @@ async def session_upload_notes(session_id: str, body: dict, request: Request, x_
     file_type = body.get("file_type", "image/png")
     
     if not image_base64:
-        return JSONResponse({"error": "No image data provided"}, status_code=400)
+        return JSONResponse({"success": False, "error": "No image data provided"}, status_code=400)
     
     ocr_result = await process_ocr_from_image(image_base64, file_type)
     
     if not ocr_result.get("success"):
-        return JSONResponse({"error": ocr_result.get("error", "OCR processing failed")}, status_code=500)
+        response_data = {
+            "success": False,
+            "error": ocr_result.get("error", "OCR processing failed")
+        }
+        if "setup_guide" in ocr_result:
+            response_data["setup_guide"] = ocr_result["setup_guide"]
+        return JSONResponse(response_data, status_code=400)
     
     extracted_text = ocr_result.get("text", "")
     existing_notes = doc.get("uploaded_notes", []) or []
@@ -1689,7 +1695,8 @@ async def session_upload_notes(session_id: str, body: dict, request: Request, x_
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "text": extracted_text,
         "file_type": file_type,
-        "confidence": ocr_result.get("confidence", "medium")
+        "confidence": ocr_result.get("confidence", "medium"),
+        "method": ocr_result.get("method", "unknown")
     })
     
     await db_collection.update_one(
@@ -1701,8 +1708,10 @@ async def session_upload_notes(session_id: str, body: dict, request: Request, x_
         "success": True,
         "extracted_text": extracted_text,
         "character_count": ocr_result.get("character_count", 0),
-        "confidence": ocr_result.get("confidence", "medium")
+        "confidence": ocr_result.get("confidence", "medium"),
+        "method": ocr_result.get("method", "unknown")
     })
+
 
 
 @app.get("/api/sessions/suggest-folder",

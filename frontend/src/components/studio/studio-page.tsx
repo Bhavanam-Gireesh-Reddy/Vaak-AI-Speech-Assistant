@@ -718,11 +718,34 @@ export function StudioPageClient() {
               file_type: file.type,
             }),
           });
-          const payload = await readJson<{ extracted_text: string; character_count: number }>(response);
+          
+          const payload = await readJson<{
+            success: boolean;
+            extracted_text?: string;
+            character_count?: number;
+            error?: string;
+            setup_guide?: Record<string, unknown>;
+          }>(response);
+          
+          if (!payload.success) {
+            const errorMsg = payload.error || "OCR processing failed";
+            if (payload.setup_guide) {
+              setError(
+                `${errorMsg}\n\nSetup guide:\n${Object.entries(payload.setup_guide)
+                  .map(([key, val]) => `${key}: ${val}`)
+                  .join("\n")}`
+              );
+            } else {
+              setError(errorMsg);
+            }
+            setBusyKey("");
+            return;
+          }
+          
           const existingNotes = detail.uploaded_notes ?? [];
           existingNotes.push({
             timestamp: new Date().toISOString(),
-            text: payload.extracted_text,
+            text: payload.extracted_text || "",
             file_type: file.type,
             confidence: "high",
           });

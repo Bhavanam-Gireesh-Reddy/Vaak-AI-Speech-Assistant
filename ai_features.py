@@ -522,37 +522,86 @@ async def extract_action_items(session_doc: dict[str, Any]) -> list[dict[str, An
 
 
 async def process_ocr_from_image(image_base64: str, file_type: str = "image/png") -> dict[str, Any]:
-    """Process OCR from uploaded image or handwritten notes."""
+    """Process OCR from uploaded image or handwritten notes with multiple fallback options."""
     try:
         import base64
         import io
         from PIL import Image
-        import pytesseract
     except ImportError:
-        print("  [OCR] ❌ Pytesseract or Pillow not installed")
-        return {"success": False, "error": "OCR not available", "text": ""}
+        print("  [OCR] ❌ Pillow not installed")
+        return {
+            "success": False,
+            "error": "Image processing library not available. Install Pillow: pip install Pillow",
+            "text": ""
+        }
 
     try:
         # Decode base64
         image_data = base64.b64decode(image_base64)
         image = Image.open(io.BytesIO(image_data))
         
-        # Perform OCR
-        text = pytesseract.image_to_string(image, lang='eng')
+        # Try Tesseract first (system-installed)
+        try:
+            import pytesseract
+            text = pytesseract.image_to_string(image, lang='eng')
+            if text and text.strip():
+                cleaned_text = re.sub(r'\s+', ' ', text).strip()
+                return {
+                    "success": True,
+                    "text": cleaned_text,
+                    "confidence": "high",
+                    "file_type": file_type,
+                    "character_count": len(cleaned_text),
+                    "method": "tesseract"
+                }
+        except (ImportError, Exception) as tesseract_error:
+            print(f"  [OCR] ⚠️  Tesseract unavailable: {str(tesseract_error)[:100]}")
         
-        # Clean up text
-        cleaned_text = re.sub(r'\s+', ' ', text).strip()
+        # Try EasyOCR as fallback (lightweight)
+        try:
+            import easyocr
+            reader = easyocr.Reader(['en'], gpu=False)
+            # Convert PIL image to numpy array
+            import numpy as np
+            img_array = np.array(image)
+            result = reader.readtext(img_array, detail=0)  # detail=0 returns just text
+            text = ' '.join(result) if result else ""
+            
+            if text and text.strip():
+                cleaned_text = re.sub(r'\s+', ' ', text).strip()
+                return {
+                    "success": True,
+                    "text": cleaned_text,
+                    "confidence": "medium",
+                    "file_type": file_type,
+                    "character_count": len(cleaned_text),
+                    "method": "easyocr"
+                }
+        except ImportError:
+            print("  [OCR] ⚠️  EasyOCR not installed")
+        except Exception as easyocr_error:
+            print(f"  [OCR] ⚠️  EasyOCR error: {str(easyocr_error)[:100]}")
         
+        # If both fail, return helpful message
         return {
-            "success": True,
-            "text": cleaned_text,
-            "confidence": "medium",
-            "file_type": file_type,
-            "character_count": len(cleaned_text)
+            "success": False,
+            "error": "OCR not available. Install one of: 1) Tesseract (system) or 2) Run: pip install easyocr",
+            "text": "",
+            "setup_guide": {
+                "option1": "Install Tesseract: https://github.com/UB-Mannheim/tesseract/wiki",
+                "option2": "Install EasyOCR: pip install easyocr (recommended for cloud)",
+                "note": "EasyOCR will be downloaded on first use (~100MB)"
+            }
         }
+        
     except Exception as e:
         print(f"  [OCR] ❌ Error processing image: {e}")
-        return {"success": False, "error": str(e), "text": ""}
+        return {
+            "success": False,
+            "error": f"Image processing failed: {str(e)}",
+            "text": ""
+        }
+
 
 
 def search_sessions_by_keyword(sessions: list[dict[str, Any]], keyword: str) -> list[dict[str, Any]]:
