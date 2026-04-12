@@ -1664,13 +1664,18 @@ async def session_action_items(session_id: str, body: dict, request: Request, x_
 @app.post("/api/sessions/{session_id}/upload-notes",
     summary="Upload and process handwritten notes with OCR",
     tags=["AI Features"])
-async def session_upload_notes(session_id: str, body: dict, request: Request, x_api_key: str = Header(default="")):
+async def session_upload_notes(session_id: str, request: Request, x_api_key: str = Header(default="")):
     if not AI_FEATURES_AVAILABLE:
         return JSONResponse({"error": "AI features are not available"}, status_code=503)
     result, error = await get_session_for_user(session_id, request, x_api_key)
     if error:
         return error
     doc, user = result
+    
+    try:
+        body = await request.json()
+    except Exception as e:
+        return JSONResponse({"success": False, "error": f"Invalid JSON: {str(e)}"}, status_code=400)
     
     image_base64 = body.get("image_data", "")
     file_type = body.get("file_type", "image/png")

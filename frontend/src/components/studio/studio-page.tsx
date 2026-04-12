@@ -125,11 +125,31 @@ const translationOptions = [
 ] as const;
 
 async function readJson<T>(response: Response) {
-  const payload = (await response.json()) as T & { error?: string };
-  if (!response.ok) {
-    throw new Error(payload.error ?? "Request failed.");
+  try {
+    // Check if response has content
+    if (response.status === 204) {
+      return {} as T;
+    }
+    
+    const text = await response.text();
+    if (!text) {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: Empty response`);
+      }
+      return {} as T;
+    }
+    
+    const payload = JSON.parse(text) as T & { error?: string };
+    if (!response.ok) {
+      throw new Error(payload.error ?? `HTTP ${response.status}: Request failed.`);
+    }
+    return payload as T;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error(`JSON parse error: ${error.message}`);
+    }
+    throw error;
   }
-  return payload as T;
 }
 
 function StudioCard({
@@ -1440,18 +1460,31 @@ export function StudioPageClient() {
                     </div>
 
                     {detail.uploaded_notes && detail.uploaded_notes.length > 0 && (
-                      <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                      <div className="space-y-3 max-h-[400px] overflow-y-auto">
                         {detail.uploaded_notes.map((note: { timestamp: string; text: string; file_type: string; confidence: string }, index: number) => (
                           <div
                             key={index}
                             className="rounded-3xl border border-slate-200 bg-slate-50 p-4"
                           >
-                            <p className="text-xs text-slate-500 mb-2">
-                              {new Date(note.timestamp).toLocaleString()}
+                            <div className="flex justify-between items-start mb-2">
+                              <p className="text-xs text-slate-500">
+                                {new Date(note.timestamp).toLocaleString()}
+                              </p>
+                              <span className={`text-[10px] font-semibold px-2 py-1 rounded-full ${
+                                note.confidence === "high"
+                                  ? "bg-green-100 text-green-700"
+                                  : note.confidence === "medium"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-red-100 text-red-700"
+                              }`}>
+                                {(note.confidence || "medium").toUpperCase()}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400 mb-2">
+                              Type: {note.file_type} • Characters: {(note.text || "").length}
                             </p>
-                            <p className="text-sm text-slate-700 break-words">
-                              {note.text.substring(0, 200)}
-                              {note.text.length > 200 ? "..." : ""}
+                            <p className="text-sm text-slate-700 break-words whitespace-pre-wrap">
+                              {note.text}
                             </p>
                           </div>
                         ))}
