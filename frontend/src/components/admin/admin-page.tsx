@@ -58,7 +58,7 @@ export function AdminPage({ initialIsAdmin }: { initialIsAdmin: boolean }) {
 
   if (!initialIsAdmin) {
     return (
-      <section className="rounded-[28px] border border-amber-200 bg-amber-50 p-8 shadow-[0_20px_40px_rgba(245,158,11,0.08)]">
+      <section className="rounded-2xl border border-amber-200 bg-amber-50 p-8 shadow-sm">
         <div className="flex items-start gap-4">
           <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-amber-600">
             <ShieldAlert className="h-6 w-6" />
@@ -117,7 +117,7 @@ export function AdminPage({ initialIsAdmin }: { initialIsAdmin: boolean }) {
         ].map(({ icon: Icon, label, value }) => (
           <div
             key={label}
-            className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_26px_60px_rgba(15,23,42,0.08)] backdrop-blur"
+            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
           >
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
@@ -134,7 +134,7 @@ export function AdminPage({ initialIsAdmin }: { initialIsAdmin: boolean }) {
         ))}
       </section>
 
-      <section className="rounded-[28px] border border-white/70 bg-white/90 p-7 shadow-[0_26px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
         <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
           Webhooks
         </p>
@@ -167,7 +167,7 @@ export function AdminPage({ initialIsAdmin }: { initialIsAdmin: boolean }) {
         {status ? <p className="mt-3 text-sm text-slate-500">{status}</p> : null}
       </section>
 
-      <section className="rounded-[28px] border border-white/70 bg-white/90 p-7 shadow-[0_26px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
@@ -186,7 +186,7 @@ export function AdminPage({ initialIsAdmin }: { initialIsAdmin: boolean }) {
             {error}
           </p>
         ) : (
-          <div className="mt-8 overflow-hidden rounded-3xl border border-slate-200">
+          <div className="mt-8 overflow-hidden rounded-2xl border border-slate-200">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">

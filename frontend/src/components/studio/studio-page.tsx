@@ -169,7 +169,7 @@ function StudioCard({
 }) {
   return (
     <section
-      className={`overflow-hidden rounded-lg sm:rounded-2xl md:rounded-[24px] lg:rounded-[30px] border border-white/70 bg-white/90 p-3 sm:p-4 md:p-5 lg:p-6 shadow-[0_8px_16px_rgba(15,23,42,0.06)] sm:shadow-[0_12px_24px_rgba(15,23,42,0.06)] md:shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur ${className ?? ""}`}
+      className={`overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm ${className ?? ""}`}
     >
       <div className="flex flex-col gap-2 sm:gap-3 md:gap-4">
         <div className="min-w-0">
@@ -193,7 +193,7 @@ function MetricCard({
   value: string;
 }) {
   return (
-    <div className="flex h-full min-h-[90px] sm:min-h-[100px] md:min-h-[120px] lg:min-h-[132px] flex-col justify-between rounded-lg sm:rounded-2xl md:rounded-[24px] lg:rounded-[30px] border border-white/70 bg-white/90 p-3 sm:p-3.5 md:p-4 lg:p-5 shadow-[0_8px_16px_rgba(15,23,42,0.06)] sm:shadow-[0_12px_24px_rgba(15,23,42,0.06)] md:shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
+    <div className="flex h-full min-h-[100px] md:min-h-[120px] lg:min-h-[140px] flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 md:p-5 shadow-sm">
       <p className="text-[8px] xsm:text-[9px] sm:text-[10px] md:text-[11px] font-semibold uppercase tracking-[0.15em] sm:tracking-[0.18em] md:tracking-[0.24em] text-slate-500">
         {label}
       </p>
@@ -319,7 +319,7 @@ function MindMapPreview({
 
   if (!derivedOutline.length) {
     return (
-      <pre className="min-h-[260px] whitespace-pre-wrap break-words rounded-3xl border border-slate-200 bg-slate-50 p-5 font-mono text-sm leading-7 text-slate-700">
+      <pre className="min-h-[260px] whitespace-pre-wrap break-words rounded-2xl border border-slate-200 bg-slate-50 p-6 font-mono text-sm leading-relaxed text-slate-700">
         {mermaid || "No mind map generated yet."}
       </pre>
     );
@@ -337,7 +337,7 @@ function MindMapPreview({
         {derivedOutline.map((node, index) => (
           <div
             key={`${node.text ?? "branch"}-${index}`}
-            className="rounded-[28px] border border-slate-200 bg-slate-50 p-5"
+            className="rounded-2xl border border-slate-200 bg-slate-50 p-6"
           >
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
               Branch {index + 1}
@@ -381,7 +381,7 @@ function MindMapPreview({
       </div>
 
       {mermaid ? (
-        <details className="rounded-3xl border border-slate-200 bg-white p-4">
+        <details className="rounded-2xl border border-slate-200 bg-white p-5">
           <summary className="cursor-pointer text-sm font-semibold text-slate-700">
             Mermaid source
           </summary>
@@ -795,7 +795,7 @@ export function StudioPageClient() {
 
   return (
     <div className="grid gap-4 md:gap-8 overflow-x-hidden pb-6 md:pb-8">
-      <section className="rounded-[24px] md:rounded-[30px] border border-white/70 bg-white/90 p-4 md:p-7 shadow-[0_28px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
         <p className="text-[10px] md:text-sm font-semibold uppercase tracking-[0.2em] md:tracking-[0.24em] text-sky-700">
           Studio
         </p>

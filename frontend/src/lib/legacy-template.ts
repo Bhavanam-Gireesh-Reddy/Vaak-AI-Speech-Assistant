@@ -9,9 +9,9 @@ const templatesRoot = path.resolve(process.cwd(), "legacy");
 const liveLightThemeOverrides = `
 <style id="next-light-overrides">
   :root {
-    --bg: #f5f9fc !important;
+    --bg: #f1f5f9 !important;
     --surface: #ffffff !important;
-    --border: #d7e3ef !important;
+    --border: #e2e8f0 !important;
     --accent: #0284c7 !important;
     --accent2: #0f766e !important;
     --success: #15803d !important;
@@ -19,18 +19,17 @@ const liveLightThemeOverrides = `
     --danger: #b91c1c !important;
     --text: #0f172a !important;
     --muted: #64748b !important;
-    --glow: 0 30px 70px rgba(15, 23, 42, 0.08) !important;
+    --glow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
   }
 
   html,
   body {
-    background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%) !important;
+    background: #f1f5f9 !important;
     color: var(--text) !important;
   }
 
   body::before {
-    opacity: 0.45 !important;
-    filter: saturate(0.65) !important;
+    display: none !important;
   }
 
   .page,
@@ -44,7 +43,9 @@ const liveLightThemeOverrides = `
   .history-card,
   .metric-card,
   .floating-panel {
-    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
+    border-radius: 16px !important;
   }
 
   .btn.primary,
@@ -62,8 +63,10 @@ const liveLightThemeOverrides = `
   }
 
   .app {
-    max-width: 1100px !important;
-    padding-top: 0 !important;
+    max-width: 1400px !important;
+    padding-top: 5px !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
   }
 </style>
 `;

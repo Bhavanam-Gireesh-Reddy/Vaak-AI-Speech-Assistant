@@ -19,7 +19,7 @@ export function AppShell({ children, user }: AppShellProps) {
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fbff_0%,#f1f5f9_100%)]">
+    <div className="min-h-screen bg-slate-50">
       {/* Mobile Header */}
       <div className="sticky top-0 z-40 flex items-center justify-between border-b border-white/70 bg-white/85 px-3 py-3 sm:px-4 sm:py-3.5 md:px-6 backdrop-blur lg:hidden">
         <div className="flex items-center gap-2">
@@ -59,7 +59,7 @@ export function AppShell({ children, user }: AppShellProps) {
       <div className="flex min-h-[calc(100vh-54px)] sm:min-h-[calc(100vh-60px)] flex-col lg:min-h-screen">
         {/* Sidebar - Desktop and Mobile */}
         <aside
-          className={`fixed inset-y-0 top-[54px] sm:top-[60px] left-0 z-30 w-56 sm:w-64 transform overflow-y-auto rounded-none border-r border-white/70 bg-white/85 p-3 sm:p-4 md:p-6 sm:shadow-lg backdrop-blur transition-transform duration-300 ease-in-out lg:static lg:top-0 lg:inset-auto lg:w-[290px] lg:transform-none lg:rounded-[28px] lg:border lg:border-l-0 lg:shadow-[0_30px_70px_rgba(15,23,42,0.08)] ${
+          className={`fixed inset-y-0 top-[54px] sm:top-[60px] left-0 z-30 w-56 sm:w-64 transform overflow-y-auto border-r border-slate-200 bg-white p-4 md:p-6 transition-transform duration-300 ease-in-out lg:static lg:top-0 lg:inset-auto lg:w-72 lg:transform-none lg:border-r lg:border-slate-200 ${
             isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           }`}
         >
@@ -91,9 +91,10 @@ export function AppShell({ children, user }: AppShellProps) {
           </div>
         </aside>
 
-        {/* Main Content */}
-        <div className="flex flex-1 flex-col gap-3 sm:gap-4 md:gap-6 px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 lg:px-8">
-          <main className="mx-auto w-full max-w-7xl">{children}</main>
+        <div className="flex flex-1 flex-col overflow-x-hidden">
+          <main className="mx-auto w-full max-w-[1600px] p-4 sm:p-6 md:p-8 lg:p-10">
+            {children}
+          </main>
         </div>
       </div>
     </div>

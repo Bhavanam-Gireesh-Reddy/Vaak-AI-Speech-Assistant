@@ -179,7 +179,7 @@ export function HistoryPage() {
 
   return (
     <div className="grid gap-6">
-      <section className="rounded-[24px] md:rounded-[28px] border border-white/70 bg-white/90 p-4 md:p-7 shadow-[0_26px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
         <div className="flex flex-col gap-4 md:gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-[10px] md:text-sm font-semibold uppercase tracking-[0.2em] md:tracking-[0.24em] text-sky-700">
@@ -257,11 +257,11 @@ export function HistoryPage() {
       </section>
 
       {isLoading ? (
-        <div className="rounded-[28px] border border-slate-200 bg-white/90 p-8 text-sm text-slate-500 shadow-[0_26px_60px_rgba(15,23,42,0.08)]">
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-500 shadow-sm">
           Loading sessions...
         </div>
       ) : error ? (
-        <div className="rounded-[28px] border border-rose-200 bg-rose-50 p-8 text-sm text-rose-700 shadow-[0_20px_40px_rgba(244,63,94,0.08)]">
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-sm text-rose-700 shadow-sm">
           {error}
         </div>
       ) : filteredSessions.length ? (
@@ -282,7 +282,7 @@ export function HistoryPage() {
             return (
               <article
                 key={session.session_id}
-                className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_26px_60px_rgba(15,23,42,0.08)] backdrop-blur"
+                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
               >
                 <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                   <div className="space-y-3">
@@ -350,7 +350,7 @@ export function HistoryPage() {
                 {expandedId === session.session_id ? (
                   <div className="mt-6 grid gap-6 border-t border-slate-200 pt-6">
                     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
-                      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                         <div className="flex items-center justify-between gap-4">
                           <h5 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
                             Transcript
@@ -370,7 +370,7 @@ export function HistoryPage() {
                       </div>
 
                       <div className="grid gap-4">
-                        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                           <h5 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
                             Actions
                           </h5>
@@ -452,7 +452,7 @@ export function HistoryPage() {
                           </div>
                         </div>
 
-                        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                           <h5 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
                             Folder
                           </h5>
@@ -490,7 +490,7 @@ export function HistoryPage() {
                     {session.notes || session.summary ? (
                       <div className="grid gap-4 lg:grid-cols-2">
                         {session.summary ? (
-                          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                             <h5 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
                               Summary
                             </h5>
@@ -500,7 +500,7 @@ export function HistoryPage() {
                           </div>
                         ) : null}
                         {session.notes ? (
-                          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                             <h5 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
                               Notes
                             </h5>
@@ -530,7 +530,7 @@ export function HistoryPage() {
           })}
         </div>
       ) : (
-        <div className="rounded-[28px] border border-dashed border-slate-200 bg-white/80 px-8 py-16 text-center text-sm text-slate-500 shadow-[0_26px_60px_rgba(15,23,42,0.06)]">
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-8 py-16 text-center text-sm text-slate-500 shadow-sm">
           No sessions match your current filters.
         </div>
       )}
