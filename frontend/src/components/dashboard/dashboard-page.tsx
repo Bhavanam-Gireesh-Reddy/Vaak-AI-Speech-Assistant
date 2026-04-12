@@ -34,42 +34,42 @@ function StatCard({
   detail: string;
 }) {
   return (
-    <div className="rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_26px_60px_rgba(15,23,42,0.08)] backdrop-blur">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
+    <div className="rounded-[24px] md:rounded-[28px] border border-white/70 bg-white/90 p-4 md:p-6 shadow-[0_26px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+      <div className="flex items-center justify-between gap-3 md:gap-4">
+        <p className="text-[10px] md:text-xs font-semibold uppercase tracking-[0.2em] md:tracking-[0.24em] text-sky-700">
           {label}
         </p>
-        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
-          <Icon className="h-5 w-5" />
+        <span className="flex h-9 md:h-11 w-9 md:w-11 items-center justify-center rounded-xl md:rounded-2xl bg-sky-50 text-sky-700">
+          <Icon className="h-4 md:h-5 w-4 md:w-5" />
         </span>
       </div>
-      <p className="mt-6 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+      <p className="mt-3 md:mt-6 text-xl md:text-3xl font-semibold tracking-[-0.02em] md:tracking-[-0.04em] text-slate-950">
         {value}
       </p>
-      <p className="mt-2 text-sm text-slate-500">{detail}</p>
+      <p className="mt-1 md:mt-2 text-xs md:text-sm text-slate-500">{detail}</p>
     </div>
   );
 }
 
 function DashboardHero({ user }: { user: AuthUser }) {
   return (
-    <section className="grid gap-5 rounded-[30px] border border-white/70 bg-white/90 p-7 shadow-[0_28px_70px_rgba(15,23,42,0.08)] backdrop-blur xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+    <section className="grid gap-4 md:gap-5 rounded-[24px] md:rounded-[30px] border border-white/70 bg-white/90 p-4 md:p-7 shadow-[0_28px_70px_rgba(15,23,42,0.08)] backdrop-blur lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
       <div className="max-w-3xl">
-        <div className="inline-flex items-center gap-2 rounded-full bg-sky-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
-          <Sparkles className="h-3.5 w-3.5" />
+        <div className="inline-flex items-center gap-2 rounded-full bg-sky-50 px-3 md:px-4 py-1.5 md:py-2 text-[10px] md:text-xs font-semibold uppercase tracking-[0.2em] md:tracking-[0.24em] text-sky-700">
+          <Sparkles className="h-3 md:h-3.5 w-3 md:w-3.5" />
           Workspace
         </div>
-        <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+        <h2 className="mt-3 md:mt-4 text-xl md:text-3xl font-semibold tracking-[-0.03em] md:tracking-[-0.04em] text-slate-950">
           Sessions, analytics, and admin controls
         </h2>
-        <p className="mt-3 text-sm leading-7 text-slate-600">
+        <p className="mt-2 md:mt-3 text-xs md:text-sm leading-5 md:leading-7 text-slate-600">
           Your Next.js frontend now sits on top of the existing FastAPI backend
           with protected routes, shared navigation, and authenticated data
           access.
         </p>
       </div>
 
-      <div className="flex flex-col gap-4 xl:min-w-[420px]">
+      <div className="flex flex-col gap-3 md:gap-4 lg:min-w-[420px]">
         <UserSummary user={user} />
         <div className="flex justify-end">
           <LogoutButton />
@@ -139,7 +139,7 @@ export function DashboardClientPage({ user }: { user: AuthUser }) {
     <div className="grid gap-6">
       <DashboardHero user={user} />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           detail="Tracked across your saved sessions"
           icon={Activity}

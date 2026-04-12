@@ -179,16 +179,16 @@ export function HistoryPage() {
 
   return (
     <div className="grid gap-6">
-      <section className="rounded-[28px] border border-white/70 bg-white/90 p-7 shadow-[0_26px_60px_rgba(15,23,42,0.08)] backdrop-blur">
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+      <section className="rounded-[24px] md:rounded-[28px] border border-white/70 bg-white/90 p-4 md:p-7 shadow-[0_26px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+        <div className="flex flex-col gap-4 md:gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
+            <p className="text-[10px] md:text-sm font-semibold uppercase tracking-[0.2em] md:tracking-[0.24em] text-sky-700">
               Session history
             </p>
-            <h3 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+            <h3 className="mt-2 text-xl md:text-3xl font-semibold tracking-[-0.03em] md:tracking-[-0.04em] text-slate-950">
               Search, review, and organize saved transcripts
             </h3>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+            <p className="mt-2 md:mt-3 max-w-3xl text-xs md:text-sm leading-5 md:leading-6 text-slate-600">
               This Phase 2 view replaces the old static history template with a
               fully authenticated React screen for filtering, translating,
               sharing, downloading, and managing your sessions.
@@ -196,7 +196,7 @@ export function HistoryPage() {
           </div>
 
           <button
-            className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+            className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 w-full md:w-auto"
             onClick={() => void refresh()}
             type="button"
           >
@@ -204,7 +204,7 @@ export function HistoryPage() {
           </button>
         </div>
 
-        <div className="mt-8 grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_repeat(3,minmax(0,0.55fr))]">
+        <div className="mt-6 md:mt-8 grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.3fr)_repeat(3,minmax(0,0.55fr))]">
           <label className="relative">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input

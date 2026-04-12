@@ -149,18 +149,18 @@ function StudioCard({
 }) {
   return (
     <section
-      className={`overflow-hidden rounded-[30px] border border-white/70 bg-white/90 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur lg:p-7 ${className ?? ""}`}
+      className={`overflow-hidden rounded-[24px] md:rounded-[30px] border border-white/70 bg-white/90 p-4 md:p-6 lg:p-7 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur ${className ?? ""}`}
     >
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3 md:gap-4">
         <div className="min-w-0">
-          <h3 className="text-lg font-semibold text-slate-950">{title}</h3>
+          <h3 className="text-base md:text-lg font-semibold text-slate-950">{title}</h3>
           {subtitle ? (
-            <p className="mt-2 text-sm leading-6 text-slate-500">{subtitle}</p>
+            <p className="mt-1 md:mt-2 text-xs md:text-sm leading-5 md:leading-6 text-slate-500">{subtitle}</p>
           ) : null}
         </div>
         {actions ? <div className="self-start">{actions}</div> : null}
       </div>
-      <div className={`mt-6 ${bodyClassName ?? ""}`}>{children}</div>
+      <div className={`mt-4 md:mt-6 ${bodyClassName ?? ""}`}>{children}</div>
     </section>
   );
 }
@@ -173,11 +173,11 @@ function MetricCard({
   value: string;
 }) {
   return (
-    <div className="flex h-full min-h-[132px] flex-col justify-between rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+    <div className="flex h-full min-h-[100px] md:min-h-[132px] flex-col justify-between rounded-[20px] md:rounded-[30px] border border-white/70 bg-white/90 p-3 md:p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
+      <p className="text-[10px] md:text-[11px] font-semibold uppercase tracking-[0.2em] md:tracking-[0.24em] text-slate-500">
         {label}
       </p>
-      <p className="mt-6 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+      <p className="mt-3 md:mt-6 text-lg md:text-2xl font-semibold tracking-[-0.02em] md:tracking-[-0.03em] text-slate-950">
         {value}
       </p>
     </div>
@@ -774,15 +774,15 @@ export function StudioPageClient() {
   const currentQuiz = quizQuestions[quizIndex];
 
   return (
-    <div className="grid gap-8 overflow-x-hidden pb-8">
-      <section className="rounded-[30px] border border-white/70 bg-white/90 p-7 shadow-[0_28px_70px_rgba(15,23,42,0.08)] backdrop-blur">
-        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
+    <div className="grid gap-4 md:gap-8 overflow-x-hidden pb-6 md:pb-8">
+      <section className="rounded-[24px] md:rounded-[30px] border border-white/70 bg-white/90 p-4 md:p-7 shadow-[0_28px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+        <p className="text-[10px] md:text-sm font-semibold uppercase tracking-[0.2em] md:tracking-[0.24em] text-sky-700">
           Studio
         </p>
-        <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+        <h2 className="mt-2 text-xl md:text-3xl font-semibold tracking-[-0.03em] md:tracking-[-0.04em] text-slate-950">
           Native AI study workspace
         </h2>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+        <p className="mt-2 md:mt-3 max-w-3xl text-xs md:text-sm leading-5 md:leading-6 text-slate-600">
           The Studio route now runs as real Next.js UI with session browsing, AI
           generation, transcript chat, translation, and YouTube import wired to
           your existing backend.
@@ -790,13 +790,13 @@ export function StudioPageClient() {
       </section>
 
       {error ? (
-        <div className="rounded-[24px] border border-rose-200 bg-rose-50 px-6 py-4 text-sm leading-6 text-rose-700">
+        <div className="rounded-[20px] md:rounded-[24px] border border-rose-200 bg-rose-50 px-4 md:px-6 py-3 md:py-4 text-xs md:text-sm leading-5 md:leading-6 text-rose-700">
           {error}
         </div>
       ) : null}
 
-      <div className="grid items-start gap-8 2xl:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="space-y-5 2xl:sticky 2xl:top-6">
+      <div className="grid items-start gap-6 md:gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <aside className="space-y-4 md:space-y-5 lg:sticky lg:top-6">
           <StudioCard
             subtitle={youtubeStatus}
             title="YouTube import"
@@ -921,7 +921,7 @@ export function StudioPageClient() {
             </div>
           ) : (
             <>
-              <section className="grid items-stretch gap-5 2xl:grid-cols-[minmax(0,1.15fr)_minmax(300px,0.85fr)]">
+              <section className="grid items-stretch gap-4 md:gap-5 md:grid-cols-[minmax(0,1fr)_minmax(250px,1fr)] lg:grid-cols-[minmax(0,1.15fr)_minmax(300px,0.85fr)]">
                 <StudioCard
                   subtitle={
                     detail.source_type === "youtube"
@@ -968,7 +968,7 @@ export function StudioPageClient() {
                 </div>
               </section>
 
-              <section className="grid items-stretch gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.92fr)]">
+              <section className="grid items-stretch gap-4 md:gap-5 md:grid-cols-[minmax(0,1fr)_minmax(280px,1fr)] lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.92fr)]">
                 <StudioCard
                   bodyClassName="h-full"
                   className="h-full"
@@ -1012,7 +1012,7 @@ export function StudioPageClient() {
                         Speaker detection is not available for this session yet.
                       </div>
                     )}
-                    <div className="mt-auto grid auto-rows-fr gap-3 sm:grid-cols-3">
+                    <div className="mt-auto grid auto-rows-fr gap-2 md:gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
                       <div className="flex min-h-[120px] flex-col justify-between rounded-3xl border border-slate-200 bg-slate-50 p-5">
                         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                           Overall

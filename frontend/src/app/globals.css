@@ -22,6 +22,8 @@
 
 html {
   min-height: 100%;
+  font-size: clamp(14px, 2.5vw, 16px);
+  @apply scroll-smooth;
 }
 
 body {
@@ -30,6 +32,7 @@ body {
   background: var(--background);
   font-family: var(--font-geist-sans), sans-serif;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
@@ -44,9 +47,51 @@ select {
   font: inherit;
 }
 
+/* Ensure touch-friendly minimum sizes on mobile */
+@layer components {
+  button,
+  input,
+  textarea,
+  select {
+    @apply min-h-[44px] sm:min-h-[40px];
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    @apply min-h-fit sm:min-h-fit;
+  }
+}
+
 ::selection {
   background: rgba(14, 165, 233, 0.18);
   color: var(--foreground);
+}
+
+/* Ensure images are responsive */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Better mobile form input experience */
+input,
+textarea,
+select {
+  font-size: max(16px, 1em);
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Prevent text zoom on iOS when focused */
+@media (max-width: 768px) {
+  input,
+  textarea,
+  select,
+  button {
+    font-size: 16px;
+  }
 }
 
 @layer utilities {

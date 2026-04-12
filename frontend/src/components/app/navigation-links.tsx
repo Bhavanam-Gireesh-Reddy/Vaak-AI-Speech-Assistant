@@ -33,7 +33,13 @@ const baseNavigation = [
   },
 ];
 
-export function NavigationLinks({ isAdmin }: { isAdmin: boolean }) {
+export function NavigationLinks({
+  isAdmin,
+  onNavigate,
+}: {
+  isAdmin: boolean;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   const items = isAdmin
     ? [
@@ -47,7 +53,7 @@ export function NavigationLinks({ isAdmin }: { isAdmin: boolean }) {
     : baseNavigation;
 
   return (
-    <nav className="mt-8 space-y-2">
+    <nav className="mt-6 space-y-2 lg:mt-8">
       {items.map(({ href, icon: Icon, label }) => {
         const isActive = pathname === href;
 
@@ -60,6 +66,7 @@ export function NavigationLinks({ isAdmin }: { isAdmin: boolean }) {
                 : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-950"
             }`}
             href={href}
+            onClick={onNavigate}
           >
             <Icon className="h-4 w-4" />
             {label}
