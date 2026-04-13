@@ -952,51 +952,51 @@ export function LandingPage({ isLoggedIn }: LandingPageProps) {
                 </p>
                 <p className="mt-2" style={{ color: "rgba(52,211,153,0.4)" }}>{"{"}</p>
                 <p className="pl-4">
-                  <span style={{ color: "#67e8f9" }}>"session_id"</span>
+                  <span style={{ color: "#67e8f9" }}>{'"session_id"'}</span>
                   <span style={{ color: "rgba(255,255,255,0.35)" }}>: </span>
-                  <span style={{ color: "#fbbf24" }}>"sws_a3f9b2c1"</span>
+                  <span style={{ color: "#fbbf24" }}>{'"sws_a3f9b2c1"'}</span>
                   <span style={{ color: "rgba(255,255,255,0.25)" }}>,</span>
                 </p>
                 <p className="pl-4">
-                  <span style={{ color: "#67e8f9" }}>"timestamp"</span>
+                  <span style={{ color: "#67e8f9" }}>{'"timestamp"'}</span>
                   <span style={{ color: "rgba(255,255,255,0.35)" }}>: </span>
                   <span style={{ color: "#a78bfa" }}>1715284974</span>
                   <span style={{ color: "rgba(255,255,255,0.25)" }}>,</span>
                 </p>
                 <p className="pl-4">
-                  <span style={{ color: "#67e8f9" }}>"speaker"</span>
+                  <span style={{ color: "#67e8f9" }}>{'"speaker"'}</span>
                   <span style={{ color: "rgba(255,255,255,0.35)" }}>: </span>
-                  <span style={{ color: "#fbbf24" }}>"Speaker 1"</span>
+                  <span style={{ color: "#fbbf24" }}>{'"Speaker 1"'}</span>
                   <span style={{ color: "rgba(255,255,255,0.25)" }}>,</span>
                 </p>
                 <p className="pl-4">
-                  <span style={{ color: "#67e8f9" }}>"text"</span>
+                  <span style={{ color: "#67e8f9" }}>{'"text"'}</span>
                   <span style={{ color: "rgba(255,255,255,0.35)" }}>: </span>
-                  <span style={{ color: "#fbbf24" }}>"Chaliye meeting shuru karte hain"</span>
+                  <span style={{ color: "#fbbf24" }}>{'"Chaliye meeting shuru karte hain"'}</span>
                   <span style={{ color: "rgba(255,255,255,0.25)" }}>,</span>
                 </p>
                 <p className="pl-4">
-                  <span style={{ color: "#67e8f9" }}>"language"</span>
+                  <span style={{ color: "#67e8f9" }}>{'"language"'}</span>
                   <span style={{ color: "rgba(255,255,255,0.35)" }}>: </span>
-                  <span style={{ color: "#fbbf24" }}>"hi-IN"</span>
+                  <span style={{ color: "#fbbf24" }}>{'"hi-IN"'}</span>
                   <span style={{ color: "rgba(255,255,255,0.25)" }}>,</span>
                 </p>
                 <p className="pl-4">
-                  <span style={{ color: "#67e8f9" }}>"confidence"</span>
+                  <span style={{ color: "#67e8f9" }}>{'"confidence"'}</span>
                   <span style={{ color: "rgba(255,255,255,0.35)" }}>: </span>
                   <span style={{ color: "#34d399" }}>0.97</span>
                   <span style={{ color: "rgba(255,255,255,0.25)" }}>,</span>
                 </p>
                 <p className="pl-4">
-                  <span style={{ color: "#67e8f9" }}>"latency_ms"</span>
+                  <span style={{ color: "#67e8f9" }}>{'"latency_ms"'}</span>
                   <span style={{ color: "rgba(255,255,255,0.35)" }}>: </span>
                   <span style={{ color: "#34d399" }}>142</span>
                   <span style={{ color: "rgba(255,255,255,0.25)" }}>,</span>
                 </p>
                 <p className="pl-4">
-                  <span style={{ color: "#67e8f9" }}>"translated"</span>
+                  <span style={{ color: "#67e8f9" }}>{'"translated"'}</span>
                   <span style={{ color: "rgba(255,255,255,0.35)" }}>: </span>
-                  <span style={{ color: "#fbbf24" }}>"Let&apos;s start the meeting"</span>
+                  <span style={{ color: "#fbbf24" }}>{'"Let\'s start the meeting"'}</span>
                 </p>
                 <p style={{ color: "rgba(52,211,153,0.4)" }}>{"}"}</p>
                 <p className="mt-1">
