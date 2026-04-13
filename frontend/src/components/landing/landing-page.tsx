@@ -18,8 +18,8 @@ import {
   Sparkles,
   Upload,
   Users,
+  Video,
   Wand2,
-  Youtube,
   Zap,
 } from "lucide-react";
 
@@ -71,7 +71,7 @@ const FEATURES = [
       "Ask questions directly about your session content — grounded, context-aware AI answers only.",
   },
   {
-    icon: Youtube,
+    icon: Video,
     color: "rose",
     title: "YouTube Import",
     description:
