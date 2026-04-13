@@ -1,5 +1,4 @@
 import { ShieldCheck, UserRound } from "lucide-react";
-
 import type { AuthUser } from "@/lib/auth-types";
 
 type UserSummaryProps = {
@@ -7,24 +6,34 @@ type UserSummaryProps = {
   compact?: boolean;
 };
 
-export function UserSummary({
-  user,
-  compact = false,
-}: UserSummaryProps) {
+export function UserSummary({ user, compact = false }: UserSummaryProps) {
   if (compact) {
     return (
-      <div className="rounded-[28px] border border-slate-200 bg-slate-50/90 p-4">
+      <div
+        className="rounded-2xl p-4"
+        style={{
+          background: "rgba(255,255,255,0.03)",
+          backdropFilter: "blur(16px)",
+          border: "1px solid rgba(255,255,255,0.07)",
+        }}
+      >
         <div className="flex items-start gap-3">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
+          <span
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+            style={{ background: "rgba(0,212,255,0.1)", color: "#00d4ff" }}
+          >
             <UserRound className="h-5 w-5" />
           </span>
           <div className="min-w-0">
-            <p className="truncate text-base font-semibold text-slate-950">
-              {user.name}
+            <p className="truncate text-base font-semibold text-white">{user.name}</p>
+            <p className="mt-0.5 truncate text-xs" style={{ color: "rgba(255,255,255,0.45)" }}>
+              {user.email}
             </p>
-            <p className="mt-1 truncate text-sm text-slate-600">{user.email}</p>
-            <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-              <ShieldCheck className="h-3.5 w-3.5" />
+            <div
+              className="mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
+              style={{ background: "rgba(52,211,153,0.1)", color: "#34d399" }}
+            >
+              <ShieldCheck className="h-3 w-3" />
               {user.is_admin ? "Administrator" : "Workspace Member"}
             </div>
           </div>
@@ -34,13 +43,25 @@ export function UserSummary({
   }
 
   return (
-    <div className="flex min-w-0 items-center gap-3 rounded-[26px] border border-slate-200 bg-slate-50/90 px-5 py-4">
-      <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] bg-sky-100 text-sky-700">
+    <div
+      className="flex min-w-0 items-center gap-3 rounded-2xl px-5 py-4"
+      style={{
+        background: "rgba(255,255,255,0.03)",
+        backdropFilter: "blur(16px)",
+        border: "1px solid rgba(255,255,255,0.07)",
+      }}
+    >
+      <span
+        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl"
+        style={{ background: "rgba(0,212,255,0.1)", color: "#00d4ff" }}
+      >
         <UserRound className="h-6 w-6" />
       </span>
       <div className="min-w-0">
-        <p className="truncate text-lg font-semibold text-slate-950">{user.name}</p>
-        <p className="truncate text-sm text-slate-500">{user.email}</p>
+        <p className="truncate text-lg font-semibold text-white">{user.name}</p>
+        <p className="truncate text-sm" style={{ color: "rgba(255,255,255,0.45)" }}>
+          {user.email}
+        </p>
       </div>
     </div>
   );
