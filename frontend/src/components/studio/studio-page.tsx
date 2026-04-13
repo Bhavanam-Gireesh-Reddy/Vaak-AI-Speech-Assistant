@@ -110,13 +110,20 @@ const CARD: React.CSSProperties = {
   background: "rgba(255,255,255,0.03)",
   backdropFilter: "blur(20px)",
   WebkitBackdropFilter: "blur(20px)",
-  border: "1px solid rgba(255,255,255,0.07)",
-  boxShadow: "0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)",
+  border: "1px solid rgba(255,255,255,0.08)",
+  boxShadow: "0 8px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)",
 };
 
 const SUBCARD: React.CSSProperties = {
   background: "rgba(255,255,255,0.03)",
   border: "1px solid rgba(255,255,255,0.06)",
+};
+
+const GRADIENT_TEXT: React.CSSProperties = {
+  background: "linear-gradient(135deg, #ffffff 20%, #a78bfa 60%, #00d4ff 100%)",
+  WebkitBackgroundClip: "text",
+  WebkitTextFillColor: "transparent",
+  backgroundClip: "text",
 };
 
 const INPUT_STYLE: React.CSSProperties = {
@@ -195,18 +202,26 @@ function StudioCard({
 }) {
   return (
     <section
-      className={`overflow-hidden rounded-2xl p-5 md:p-6 ${className ?? ""}`}
+      className={`relative overflow-hidden rounded-2xl p-5 md:p-6 ${className ?? ""}`}
       style={CARD}
     >
-      <div className="flex flex-col gap-2 sm:gap-3 md:gap-4">
+      {/* Subtle top-left corner glow */}
+      <div
+        className="pointer-events-none absolute top-0 left-0 h-24 w-24"
+        style={{ background: "radial-gradient(circle at top left, rgba(124,58,237,0.06) 0%, transparent 70%)" }}
+      />
+      <div className="relative flex flex-col gap-2 sm:gap-3 md:gap-4">
         <div className="min-w-0">
-          <h3 className="text-sm sm:text-base md:text-lg font-semibold text-white">
+          <h3
+            className="text-sm sm:text-base md:text-lg font-bold"
+            style={GRADIENT_TEXT}
+          >
             {title}
           </h3>
           {subtitle ? (
             <p
               className="mt-0.5 sm:mt-1 md:mt-2 text-xs sm:text-xs md:text-sm leading-4 sm:leading-5 md:leading-6"
-              style={{ color: "rgba(255,255,255,0.45)" }}
+              style={{ color: "rgba(255,255,255,0.4)" }}
             >
               {subtitle}
             </p>
@@ -214,7 +229,7 @@ function StudioCard({
         </div>
         {actions ? <div className="self-start">{actions}</div> : null}
       </div>
-      <div className={`mt-4 md:mt-6 ${bodyClassName ?? ""}`}>{children}</div>
+      <div className={`relative mt-4 md:mt-6 ${bodyClassName ?? ""}`}>{children}</div>
     </section>
   );
 }
@@ -228,16 +243,23 @@ function MetricCard({
 }) {
   return (
     <div
-      className="flex h-full min-h-[100px] md:min-h-[120px] lg:min-h-[140px] flex-col justify-between rounded-2xl p-4 md:p-5"
+      className="relative overflow-hidden flex h-full min-h-[100px] md:min-h-[120px] lg:min-h-[140px] flex-col justify-between rounded-2xl p-4 md:p-5"
       style={CARD}
     >
+      <div
+        className="pointer-events-none absolute bottom-0 right-0 h-16 w-16"
+        style={{ background: "radial-gradient(circle at bottom right, rgba(0,212,255,0.06) 0%, transparent 70%)" }}
+      />
       <p
         className="text-[8px] xsm:text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-[0.15em] sm:tracking-[0.18em] md:tracking-[0.24em]"
         style={{ color: "#00d4ff" }}
       >
         {label}
       </p>
-      <p className="mt-2 sm:mt-3 md:mt-4 lg:mt-6 text-base sm:text-lg md:text-xl lg:text-2xl font-bold tracking-tight text-white">
+      <p
+        className="mt-2 sm:mt-3 md:mt-4 lg:mt-6 text-base sm:text-lg md:text-xl lg:text-2xl font-bold tracking-tight"
+        style={GRADIENT_TEXT}
+      >
         {value}
       </p>
     </div>
@@ -884,24 +906,58 @@ export function StudioPageClient() {
   return (
     <div className="grid gap-4 md:gap-8 overflow-x-hidden pb-6 md:pb-8">
       {/* ── Page header ── */}
-      <section className="rounded-2xl p-6 md:p-8" style={CARD}>
-        <p
-          className="text-[10px] md:text-sm font-bold uppercase tracking-[0.2em] md:tracking-[0.24em]"
-          style={{ color: "#00d4ff" }}
-        >
-          Studio
-        </p>
-        <h2 className="mt-2 text-xl md:text-3xl font-bold tracking-tight text-white">
-          Native AI study workspace
-        </h2>
-        <p
-          className="mt-2 md:mt-3 max-w-3xl text-xs md:text-sm leading-5 md:leading-6"
-          style={{ color: "rgba(255,255,255,0.45)" }}
-        >
-          Browse sessions, generate AI artifacts, chat with your transcript,
-          translate to any language, and import from YouTube — all wired to your
-          existing backend.
-        </p>
+      <section
+        className="relative overflow-hidden rounded-3xl p-7 md:p-10"
+        style={{
+          background: "rgba(255,255,255,0.025)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          border: "1px solid rgba(124,58,237,0.18)",
+          boxShadow: "0 0 60px rgba(124,58,237,0.07), 0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)",
+        }}
+      >
+        {/* Ambient inner glows */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ background: "radial-gradient(ellipse at top left, rgba(124,58,237,0.12) 0%, transparent 55%)" }}
+        />
+        <div
+          className="pointer-events-none absolute bottom-0 right-0 h-48 w-48"
+          style={{ background: "radial-gradient(circle at bottom right, rgba(0,212,255,0.08) 0%, transparent 60%)" }}
+        />
+
+        <div className="relative">
+          <div
+            className="mb-4 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest"
+            style={{
+              background: "rgba(167,139,250,0.08)",
+              border: "1px solid rgba(167,139,250,0.22)",
+              color: "#c4b5fd",
+            }}
+          >
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ background: "#a78bfa", boxShadow: "0 0 6px #a78bfa" }}
+            />
+            AI Studio · Study Workspace
+          </div>
+          <h2
+            className="text-2xl md:text-4xl font-bold leading-tight tracking-tight"
+            style={GRADIENT_TEXT}
+          >
+            Native AI study
+            <br />
+            workspace
+          </h2>
+          <p
+            className="mt-3 max-w-2xl text-sm md:text-base leading-7"
+            style={{ color: "rgba(255,255,255,0.45)" }}
+          >
+            Browse sessions, generate AI artifacts, chat with your transcript,
+            translate to any language, and import from YouTube — all wired to your
+            existing backend.
+          </p>
+        </div>
       </section>
 
       {/* ── Error banner ── */}

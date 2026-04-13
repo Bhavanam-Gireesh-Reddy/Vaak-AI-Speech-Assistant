@@ -39,13 +39,20 @@ const CARD: React.CSSProperties = {
   background: "rgba(255,255,255,0.03)",
   backdropFilter: "blur(20px)",
   WebkitBackdropFilter: "blur(20px)",
-  border: "1px solid rgba(255,255,255,0.07)",
-  boxShadow: "0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)",
+  border: "1px solid rgba(255,255,255,0.08)",
+  boxShadow: "0 8px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)",
 };
 
 const SUBCARD: React.CSSProperties = {
   background: "rgba(255,255,255,0.03)",
   border: "1px solid rgba(255,255,255,0.06)",
+};
+
+const GRADIENT_TEXT: React.CSSProperties = {
+  background: "linear-gradient(135deg, #ffffff 20%, #a78bfa 60%, #00d4ff 100%)",
+  WebkitBackgroundClip: "text",
+  WebkitTextFillColor: "transparent",
+  backgroundClip: "text",
 };
 
 const INPUT_CLASS =
@@ -207,20 +214,52 @@ export function HistoryPage() {
   return (
     <div className="grid gap-6">
       {/* ── Header ── */}
-      <section className="rounded-2xl p-6 md:p-8" style={CARD}>
-        <div className="flex flex-col gap-4 md:gap-6 lg:flex-row lg:items-end lg:justify-between">
+      <section
+        className="relative overflow-hidden rounded-3xl p-7 md:p-10"
+        style={{
+          background: "rgba(255,255,255,0.025)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          border: "1px solid rgba(124,58,237,0.18)",
+          boxShadow: "0 0 60px rgba(124,58,237,0.07), 0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)",
+        }}
+      >
+        {/* Ambient inner glows */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ background: "radial-gradient(ellipse at top left, rgba(124,58,237,0.1) 0%, transparent 55%)" }}
+        />
+        <div
+          className="pointer-events-none absolute bottom-0 right-0 h-48 w-48"
+          style={{ background: "radial-gradient(circle at bottom right, rgba(0,212,255,0.07) 0%, transparent 60%)" }}
+        />
+
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p
-              className="text-[10px] md:text-sm font-bold uppercase tracking-[0.2em] md:tracking-[0.24em]"
-              style={{ color: "#00d4ff" }}
+            <div
+              className="mb-4 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest"
+              style={{
+                background: "rgba(0,212,255,0.08)",
+                border: "1px solid rgba(0,212,255,0.22)",
+                color: "#67e8f9",
+              }}
             >
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ background: "#00d4ff", boxShadow: "0 0 6px #00d4ff" }}
+              />
               Session history
-            </p>
-            <h3 className="mt-2 text-xl md:text-3xl font-bold tracking-tight text-white">
-              Search, review, and organize saved transcripts
+            </div>
+            <h3
+              className="text-2xl md:text-4xl font-bold leading-tight tracking-tight"
+              style={GRADIENT_TEXT}
+            >
+              Search, review &amp;
+              <br />
+              organize transcripts
             </h3>
             <p
-              className="mt-2 md:mt-3 max-w-3xl text-xs md:text-sm leading-5 md:leading-6"
+              className="mt-3 max-w-2xl text-sm md:text-base leading-7"
               style={{ color: "rgba(255,255,255,0.45)" }}
             >
               Filter, translate, share, download, and manage your sessions from
@@ -229,10 +268,10 @@ export function HistoryPage() {
           </div>
 
           <button
-            className="inline-flex h-11 items-center justify-center rounded-2xl px-5 text-sm font-medium text-white transition hover:opacity-90 w-full md:w-auto"
+            className="inline-flex h-11 items-center justify-center rounded-2xl px-6 text-sm font-semibold text-white transition hover:opacity-90 w-full md:w-auto"
             style={{
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.1)",
+              background: "linear-gradient(135deg,#7c3aed,#00d4ff)",
+              boxShadow: "0 0 20px rgba(124,58,237,0.3)",
             }}
             onClick={() => void refresh()}
             type="button"
