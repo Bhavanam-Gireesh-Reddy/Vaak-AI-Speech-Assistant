@@ -394,7 +394,14 @@ export function LivePage() {
     mediaStreamRef.current = stream;
 
     const apiBase = process.env.NEXT_PUBLIC_API_URL || window.location.origin;
-    const wsUrl = apiBase.replace(/^http/, "ws") + "/ws/translate";
+    const wsBase = apiBase.replace(/^http/, "ws") + "/ws/translate";
+    let wsToken = "";
+    try {
+      const t = await fetch("/api/ws-token");
+      const j = await t.json() as { token?: string | null };
+      wsToken = j.token ?? "";
+    } catch { /* ignore — anonymous session */ }
+    const wsUrl = wsToken ? `${wsBase}?token=${encodeURIComponent(wsToken)}` : wsBase;
     const ws = new WebSocket(wsUrl);
     ws.binaryType = "arraybuffer";
     wsRef.current = ws;
@@ -487,7 +494,14 @@ registerProcessor('pcm-processor', PCMProcessor);
       const pcmData = resampled.getChannelData(0);
 
       const apiBase = process.env.NEXT_PUBLIC_API_URL || window.location.origin;
-      const ws = new WebSocket(apiBase.replace(/^http/, "ws") + "/ws/translate");
+      const wsBase2 = apiBase.replace(/^http/, "ws") + "/ws/translate";
+      let wsToken2 = "";
+      try {
+        const t2 = await fetch("/api/ws-token");
+        const j2 = await t2.json() as { token?: string | null };
+        wsToken2 = j2.token ?? "";
+      } catch { /* ignore */ }
+      const ws = new WebSocket(wsToken2 ? `${wsBase2}?token=${encodeURIComponent(wsToken2)}` : wsBase2);
       ws.binaryType = "arraybuffer";
       wsRef.current = ws;
 
