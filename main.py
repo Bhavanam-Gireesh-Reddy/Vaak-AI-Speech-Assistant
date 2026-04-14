@@ -699,8 +699,6 @@ async def session_chat(session_id: str, body: dict, request: Request, x_api_key:
 
 @app.post("/api/youtube/import")
 async def youtube_import(body: dict, request: Request, x_api_key: str = Header(default="")):
-    if not AI_FEATURES_AVAILABLE:
-        return JSONResponse({"error": "AI features are not available"}, status_code=503)
     if db_collection is None:
         return JSONResponse({"error": "MongoDB not connected"}, status_code=503)
     user = await get_authenticated_user(request, x_api_key)

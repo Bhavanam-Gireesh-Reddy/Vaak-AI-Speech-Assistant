@@ -729,7 +729,7 @@ export function StudioPageClient() {
     setError("");
     setYoutubeStatus("Importing transcript and creating a study session...");
     try {
-      const response = await fetch("/api/youtube/import", {
+      const response = await fetch("/api/proxy/youtube/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -74,13 +74,18 @@ async def call_groq(prompt: str, system: str, max_tokens: int = 2000) -> str:
         return ""
 
 
-GROQ_VISION_MODEL = "llama-3.2-90b-vision-preview"
+GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+_GROQ_VISION_MAX_B64 = 4 * 1024 * 1024  # Groq limit: 4MB base64
 
 async def call_groq_vision(image_base64: str, file_type: str = "image/png", prompt: str = "", system: str = "") -> str:
-    """Send an image to Groq Vision API for OCR / image understanding."""
+    """Send an image to Groq Vision API (Llama 4 Scout) for OCR / image understanding."""
     api_key = _api_key() or GROQ_API_KEY
     if not api_key:
         print("  [Groq Vision] ❌ GROQ_API_KEY not set")
+        return ""
+
+    if len(image_base64) > _GROQ_VISION_MAX_B64:
+        print(f"  [Groq Vision] ⚠️ Image too large ({len(image_base64)//1024}KB > 4MB limit), skipping")
         return ""
 
     if not prompt:
@@ -116,18 +121,20 @@ async def call_groq_vision(image_base64: str, file_type: str = "image/png", prom
 
     try:
         print(f"  [Groq Vision] Calling {GROQ_VISION_MODEL}...")
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=90) as client:
             res = await client.post(GROQ_URL, headers=headers, json=payload)
             if res.status_code == 429:
                 print("  [Groq Vision] ⚠️ 429 rate limit")
                 return ""
-            res.raise_for_status()
+            if res.status_code != 200:
+                print(f"  [Groq Vision] HTTP {res.status_code}: {res.text[:200]}")
+                return ""
             data = res.json()
             content = data["choices"][0]["message"]["content"].strip()
             print(f"  [Groq Vision] ✅ Extracted {len(content)} chars")
             return content
-    except httpx.HTTPStatusError as e:
-        print(f"  [Groq Vision] HTTP error {e.response.status_code}: {e.response.text[:200]}")
+    except httpx.TimeoutException:
+        print("  [Groq Vision] ⚠️ Request timed out (90s)")
         return ""
     except Exception as e:
         print(f"  [Groq Vision] Error: {e}")

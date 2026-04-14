@@ -700,114 +700,189 @@ def _parse_vtt_to_text(vtt_text: str) -> str:
 
 def import_youtube_transcript(url: str, auth_browser: str = "", cookies_content: str = "") -> dict[str, Any]:
     if not YTDLP_AVAILABLE:
-        raise RuntimeError("yt-dlp is not installed. Add it from requirements and reinstall dependencies.")
+        raise RuntimeError(
+            "yt-dlp is not installed. Run: pip install yt-dlp"
+        )
     if not url.strip():
         raise ValueError("YouTube URL is required.")
 
     with tempfile.TemporaryDirectory(prefix="sarvam_yt_") as temp_dir:
         output_template = str(Path(temp_dir) / "%(id)s.%(ext)s")
-        ydl_opts = {
+
+        # Use multiple player clients for better bot-detection evasion
+        ydl_opts: dict[str, Any] = {
             "quiet": True,
+            "no_warnings": True,
             "skip_download": True,
             "writesubtitles": True,
             "writeautomaticsub": True,
-            "subtitleslangs": ["en", "en-US", "en-IN", "hi", "ta", "te", "kn", "ml", "bn", "mr", "gu", "pa", "or"],
+            "subtitleslangs": [
+                "en", "en-US", "en-IN", "hi", "ta", "te",
+                "kn", "ml", "bn", "mr", "gu", "pa", "or",
+            ],
             "subtitlesformat": "vtt",
             "outtmpl": output_template,
             "noplaylist": True,
-            "extractor_args": {"youtube": {"player_client": ["ios", "default"]}}
+            "socket_timeout": 30,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["mweb", "ios", "web"],
+                }
+            },
         }
+
+        # Cookie handling
+        cookies_file = None
         if auth_browser and auth_browser != "paste":
             ydl_opts["cookiesfrombrowser"] = (auth_browser,)
         elif cookies_content:
             cookies_file = Path(temp_dir) / "cookies.txt"
             cookies_file.write_text(cookies_content)
             ydl_opts["cookiefile"] = str(cookies_file)
-            
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            try:
+
+        # Step 1 — fetch metadata + subtitles
+        info = None
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
-            except Exception as e:
-                raise RuntimeError(f"YouTube block detected or metadata fetch failed: {e}")
+        except Exception as e:
+            err = str(e).lower()
+            if "sign in" in err or "bot" in err or "captcha" in err:
+                raise RuntimeError(
+                    "YouTube is blocking this request. Try pasting browser cookies "
+                    "or use a different video."
+                ) from e
+            raise RuntimeError(f"Could not fetch YouTube video: {e}") from e
 
         if not info:
-            raise RuntimeError("Could not fetch YouTube metadata. Video might be restricted.")
+            raise RuntimeError("Could not fetch YouTube metadata. The video might be private or restricted.")
 
         video_id = info.get("id")
         if not video_id:
-            raise RuntimeError("Missing YouTube video id.")
+            raise RuntimeError("Missing YouTube video ID in response.")
 
+        # Step 2 — try subtitles first
         subtitle_files = sorted(Path(temp_dir).glob(f"{video_id}*.vtt"))
-        
         transcript_text = ""
         picked_language = ""
 
-        if not subtitle_files:
-            # Fallback: transcribe audio using Groq Whisper API
-            ydl_opts_audio = {
-                "quiet": True,
-                "format": "m4a/bestaudio/best",
-                "outtmpl": str(Path(temp_dir) / f"{video_id}_audio.%(ext)s"),
-                "noplaylist": True,
-                "extractor_args": {"youtube": {"player_client": ["ios", "default"]}}
-            }
-            if auth_browser and auth_browser != "paste":
-                ydl_opts_audio["cookiesfrombrowser"] = (auth_browser,)
-            elif cookies_content:
-                cookies_file = Path(temp_dir) / "cookies.txt"
-                if not cookies_file.exists():
-                    cookies_file.write_text(cookies_content)
-                ydl_opts_audio["cookiefile"] = str(cookies_file)
-                
-            with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl_audio:
-                try:
-                    ydl_audio.extract_info(url, download=True)
-                except Exception as e:
-                    raise RuntimeError(f"No captions available and failed to download audio for transcription due to block: {e}")
-
-            audio_files = list(Path(temp_dir).glob(f"{video_id}_audio.*"))
-            if not audio_files:
-                raise RuntimeError("No captions available and failed to generate audio file for transcription.")
-            audio_file = audio_files[0]
-
-            import httpx
-            import os
-            sarvam_api_key = os.getenv("SARVAM_API_KEY", "")
-            if not sarvam_api_key or sarvam_api_key == "YOUR_SARVAM_API_KEY_HERE":
-                raise RuntimeError("No captions available. SARVAM_API_KEY is required for fallback audio transcription.")
-            
-            with open(audio_file, "rb") as f:
-                res = httpx.post(
-                    "https://api.sarvam.ai/speech-to-text",
-                    headers={"api-subscription-key": sarvam_api_key},
-                    data={"model": "saaras:v1"},
-                    files={"file": (audio_file.name, f)},
-                    timeout=300.0
-                )
-            if res.status_code == 413:
-                raise RuntimeError("The video is too long (file too large) for fallback audio transcription.")
-            
-            if res.status_code != 200:
-                raise RuntimeError(f"Sarvam API error {res.status_code}: {res.text}")
-                
-            res.raise_for_status()
-            
-            transcript_text = res.json().get("transcript", "").strip()
-            picked_language = res.json().get("language_code", "audio_fallback")
-            
-            if not transcript_text:
-                raise RuntimeError("Fallback audio transcription returned empty text.")
-        else:
+        if subtitle_files:
             for file_path in subtitle_files:
-                text = _parse_vtt_to_text(file_path.read_text(encoding="utf-8", errors="ignore"))
+                text = _parse_vtt_to_text(
+                    file_path.read_text(encoding="utf-8", errors="ignore")
+                )
                 if text:
                     transcript_text = text
                     suffix = file_path.stem.replace(video_id, "").strip(".")
                     picked_language = suffix or "unknown"
                     break
 
+        # Step 3 — fallback: download audio and transcribe via Groq Whisper
         if not transcript_text:
-            raise RuntimeError("Captions were found but the transcript could not be parsed.")
+            print("  [YouTube] No usable subtitles — falling back to audio transcription")
+
+            groq_key = os.getenv("GROQ_API_KEY", "")
+            sarvam_key = os.getenv("SARVAM_API_KEY", "")
+
+            if (not groq_key or groq_key == "YOUR_GROQ_API_KEY_HERE") and \
+               (not sarvam_key or sarvam_key == "YOUR_SARVAM_API_KEY_HERE"):
+                raise RuntimeError(
+                    "No subtitles found for this video. "
+                    "Set GROQ_API_KEY or SARVAM_API_KEY in .env for audio transcription fallback."
+                )
+
+            ydl_opts_audio: dict[str, Any] = {
+                "quiet": True,
+                "no_warnings": True,
+                "format": "m4a/bestaudio/best",
+                "outtmpl": str(Path(temp_dir) / f"{video_id}_audio.%(ext)s"),
+                "noplaylist": True,
+                "socket_timeout": 30,
+                "extractor_args": {
+                    "youtube": {"player_client": ["mweb", "ios", "web"]}
+                },
+            }
+            if auth_browser and auth_browser != "paste":
+                ydl_opts_audio["cookiesfrombrowser"] = (auth_browser,)
+            elif cookies_file and cookies_file.exists():
+                ydl_opts_audio["cookiefile"] = str(cookies_file)
+
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl_audio:
+                    ydl_audio.extract_info(url, download=True)
+            except Exception as e:
+                raise RuntimeError(
+                    f"No subtitles available and audio download failed: {e}"
+                ) from e
+
+            audio_files = list(Path(temp_dir).glob(f"{video_id}_audio.*"))
+            if not audio_files:
+                raise RuntimeError(
+                    "No subtitles found and could not download audio for transcription."
+                )
+            audio_file = audio_files[0]
+
+            # Check file size (25MB limit for Groq Whisper, Sarvam has its own)
+            file_size_mb = audio_file.stat().st_size / (1024 * 1024)
+            if file_size_mb > 25:
+                raise RuntimeError(
+                    f"Audio file is too large ({file_size_mb:.0f}MB). "
+                    "Try a shorter video (under ~15 minutes)."
+                )
+
+            import httpx
+
+            # Try Groq Whisper first (faster, free)
+            if groq_key and groq_key != "YOUR_GROQ_API_KEY_HERE":
+                try:
+                    print(f"  [YouTube] Transcribing audio via Groq Whisper ({file_size_mb:.1f}MB)...")
+                    with open(audio_file, "rb") as f:
+                        res = httpx.post(
+                            "https://api.groq.com/openai/v1/audio/transcriptions",
+                            headers={"Authorization": f"Bearer {groq_key}"},
+                            data={"model": "whisper-large-v3-turbo"},
+                            files={"file": (audio_file.name, f, "audio/mp4")},
+                            timeout=120.0,
+                        )
+                    if res.status_code == 200:
+                        transcript_text = res.json().get("text", "").strip()
+                        picked_language = "whisper_auto"
+                        print(f"  [YouTube] ✅ Groq Whisper transcribed {len(transcript_text)} chars")
+                except Exception as whisper_err:
+                    print(f"  [YouTube] ⚠️ Groq Whisper failed: {whisper_err}")
+
+            # Fallback to Sarvam STT
+            if not transcript_text and sarvam_key and sarvam_key != "YOUR_SARVAM_API_KEY_HERE":
+                try:
+                    print(f"  [YouTube] Transcribing audio via Sarvam STT ({file_size_mb:.1f}MB)...")
+                    with open(audio_file, "rb") as f:
+                        res = httpx.post(
+                            "https://api.sarvam.ai/speech-to-text",
+                            headers={"api-subscription-key": sarvam_key},
+                            data={"model": "saaras:v1"},
+                            files={"file": (audio_file.name, f)},
+                            timeout=120.0,
+                        )
+                    if res.status_code == 200:
+                        transcript_text = res.json().get("transcript", "").strip()
+                        picked_language = res.json().get("language_code", "sarvam_auto")
+                        print(f"  [YouTube] ✅ Sarvam STT transcribed {len(transcript_text)} chars")
+                    elif res.status_code == 413:
+                        raise RuntimeError(
+                            "Video audio is too large for Sarvam API. Try a shorter video."
+                        )
+                    else:
+                        print(f"  [YouTube] ⚠️ Sarvam STT error {res.status_code}: {res.text[:200]}")
+                except RuntimeError:
+                    raise
+                except Exception as sarvam_err:
+                    print(f"  [YouTube] ⚠️ Sarvam STT failed: {sarvam_err}")
+
+            if not transcript_text:
+                raise RuntimeError(
+                    "Could not extract transcript from this video. "
+                    "No subtitles found and audio transcription failed."
+                )
 
         return {
             "title": info.get("title") or "YouTube Import",
