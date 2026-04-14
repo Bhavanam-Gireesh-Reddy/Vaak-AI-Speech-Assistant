@@ -5,10 +5,8 @@ import {
   Download,
   Headphones,
   Mic,
-  MicOff,
   Square,
   Upload,
-  Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -213,7 +211,7 @@ export function LivePage() {
       const sliceW = W / bufLen; let x = 0;
       for (let i = 0; i < bufLen; i++) {
         const y = (wavData[i] / 128.0 * H) / 2;
-        i === 0 ? ctx!.moveTo(x, y) : ctx!.lineTo(x, y);
+        if (i === 0) { ctx!.moveTo(x, y); } else { ctx!.lineTo(x, y); }
         x += sliceW;
       }
       ctx!.lineTo(W, H / 2);
