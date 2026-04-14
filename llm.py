@@ -74,6 +74,66 @@ async def call_groq(prompt: str, system: str, max_tokens: int = 2000) -> str:
         return ""
 
 
+GROQ_VISION_MODEL = "llama-3.2-90b-vision-preview"
+
+async def call_groq_vision(image_base64: str, file_type: str = "image/png", prompt: str = "", system: str = "") -> str:
+    """Send an image to Groq Vision API for OCR / image understanding."""
+    api_key = _api_key() or GROQ_API_KEY
+    if not api_key:
+        print("  [Groq Vision] ❌ GROQ_API_KEY not set")
+        return ""
+
+    if not prompt:
+        prompt = (
+            "Extract ALL text from this image exactly as written. "
+            "Preserve the original structure: line breaks, paragraphs, bullet points, numbering, indentation. "
+            "If handwritten, do your best to read every word accurately. "
+            "Return ONLY the extracted text, nothing else."
+        )
+
+    # Build the multimodal message
+    media_type = file_type if file_type in ("image/png", "image/jpeg", "image/gif", "image/webp") else "image/png"
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({
+        "role": "user",
+        "content": [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{image_base64}"}},
+        ],
+    })
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": GROQ_VISION_MODEL,
+        "max_tokens": 4000,
+        "messages": messages,
+    }
+
+    try:
+        print(f"  [Groq Vision] Calling {GROQ_VISION_MODEL}...")
+        async with httpx.AsyncClient(timeout=60) as client:
+            res = await client.post(GROQ_URL, headers=headers, json=payload)
+            if res.status_code == 429:
+                print("  [Groq Vision] ⚠️ 429 rate limit")
+                return ""
+            res.raise_for_status()
+            data = res.json()
+            content = data["choices"][0]["message"]["content"].strip()
+            print(f"  [Groq Vision] ✅ Extracted {len(content)} chars")
+            return content
+    except httpx.HTTPStatusError as e:
+        print(f"  [Groq Vision] HTTP error {e.response.status_code}: {e.response.text[:200]}")
+        return ""
+    except Exception as e:
+        print(f"  [Groq Vision] Error: {e}")
+        return ""
+
+
 # ── Combined analysis: summary + filtered + corrected + title + speakers ──────
 COMBINED_SYSTEM = """You are an expert transcript analyzer for engineering lectures.
 Given a full transcript, return a JSON object with exactly these six fields:

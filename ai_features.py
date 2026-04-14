@@ -19,7 +19,7 @@ except ImportError:
     yt_dlp = None
     YTDLP_AVAILABLE = False
 
-from llm import call_groq, process_session, translate_transcript
+from llm import call_groq, call_groq_vision, process_session, translate_transcript
 
 
 LANGUAGE_CHOICES = {
@@ -522,85 +522,104 @@ async def extract_action_items(session_doc: dict[str, Any]) -> list[dict[str, An
 
 
 async def process_ocr_from_image(image_base64: str, file_type: str = "image/png") -> dict[str, Any]:
-    """Process OCR from uploaded image or handwritten notes with multiple fallback options."""
-    try:
-        import base64
-        import io
-        from PIL import Image
-    except ImportError:
-        print("  [OCR] ❌ Pillow not installed")
-        return {
-            "success": False,
-            "error": "Image processing library not available. Install Pillow: pip install Pillow",
-            "text": ""
-        }
+    """Process OCR from uploaded image or handwritten notes.
 
-    try:
-        # Decode base64
-        image_data = base64.b64decode(image_base64)
-        image = Image.open(io.BytesIO(image_data))
-        
-        # Try Tesseract first (system-installed)
+    Strategy (in order):
+    1. Groq Vision API  – best for handwritten text, uses existing API key
+    2. Tesseract         – fast, system-installed
+    3. EasyOCR           – Python-only fallback
+    """
+
+    # ── 1. Groq Vision (primary — best for handwritten notes) ────────────────
+    groq_key = os.getenv("GROQ_API_KEY", "")
+    if groq_key and groq_key != "YOUR_GROQ_API_KEY_HERE":
         try:
-            import pytesseract
-            text = pytesseract.image_to_string(image, lang='eng')
+            text = await call_groq_vision(image_base64, file_type)
             if text and text.strip():
-                cleaned_text = re.sub(r'\s+', ' ', text).strip()
+                # Preserve structure: collapse only runs of spaces (not newlines)
+                cleaned = re.sub(r"[^\S\n]+", " ", text).strip()
+                # Collapse 3+ blank lines into 2
+                cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
                 return {
                     "success": True,
-                    "text": cleaned_text,
+                    "text": cleaned,
                     "confidence": "high",
                     "file_type": file_type,
-                    "character_count": len(cleaned_text),
-                    "method": "tesseract"
+                    "character_count": len(cleaned),
+                    "method": "groq_vision",
                 }
-        except (ImportError, Exception) as tesseract_error:
-            print(f"  [OCR] ⚠️  Tesseract unavailable: {str(tesseract_error)[:100]}")
-        
-        # Try EasyOCR as fallback (lightweight)
+        except Exception as e:
+            print(f"  [OCR] ⚠️ Groq Vision failed, trying fallbacks: {e}")
+
+    # ── 2. Tesseract (system-installed) ──────────────────────────────────────
+    try:
+        import base64 as b64
+        import io
+        from PIL import Image
+
+        image_data = b64.b64decode(image_base64)
+        image = Image.open(io.BytesIO(image_data))
+
         try:
-            import easyocr
-            reader = easyocr.Reader(['en'], gpu=False)
-            # Convert PIL image to numpy array
-            import numpy as np
-            img_array = np.array(image)
-            result = reader.readtext(img_array, detail=0)  # detail=0 returns just text
-            text = ' '.join(result) if result else ""
-            
+            import pytesseract
+            text = pytesseract.image_to_string(image, lang="eng")
             if text and text.strip():
-                cleaned_text = re.sub(r'\s+', ' ', text).strip()
+                cleaned = re.sub(r"[^\S\n]+", " ", text).strip()
+                cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
                 return {
                     "success": True,
-                    "text": cleaned_text,
+                    "text": cleaned,
                     "confidence": "medium",
                     "file_type": file_type,
-                    "character_count": len(cleaned_text),
-                    "method": "easyocr"
+                    "character_count": len(cleaned),
+                    "method": "tesseract",
+                }
+        except (ImportError, Exception) as e:
+            print(f"  [OCR] ⚠️ Tesseract unavailable: {str(e)[:100]}")
+
+        # ── 3. EasyOCR (Python-only fallback) ────────────────────────────────
+        try:
+            import easyocr
+            import numpy as np
+
+            reader = easyocr.Reader(["en"], gpu=False)
+            img_array = np.array(image)
+            result = reader.readtext(img_array, detail=0)
+            text = "\n".join(result) if result else ""
+            if text and text.strip():
+                cleaned = re.sub(r"[^\S\n]+", " ", text).strip()
+                return {
+                    "success": True,
+                    "text": cleaned,
+                    "confidence": "medium",
+                    "file_type": file_type,
+                    "character_count": len(cleaned),
+                    "method": "easyocr",
                 }
         except ImportError:
-            print("  [OCR] ⚠️  EasyOCR not installed")
-        except Exception as easyocr_error:
-            print(f"  [OCR] ⚠️  EasyOCR error: {str(easyocr_error)[:100]}")
-        
-        # If both fail, return helpful message
-        return {
-            "success": False,
-            "error": "OCR not available. Install one of: 1) Tesseract (system) or 2) Run: pip install easyocr",
-            "text": "",
-            "setup_guide": {
-                "option1": "Install Tesseract: https://github.com/UB-Mannheim/tesseract/wiki",
-                "option2": "Install EasyOCR: pip install easyocr (recommended for cloud)",
-                "note": "EasyOCR will be downloaded on first use (~100MB)"
-            }
-        }
-        
+            print("  [OCR] ⚠️ EasyOCR not installed")
+        except Exception as e:
+            print(f"  [OCR] ⚠️ EasyOCR error: {str(e)[:100]}")
+
+    except ImportError:
+        print("  [OCR] ⚠️ Pillow not installed — skipping Tesseract/EasyOCR fallbacks")
     except Exception as e:
-        print(f"  [OCR] ❌ Error processing image: {e}")
-        return {
-            "success": False,
-            "error": f"Image processing failed: {str(e)}",
-            "text": ""
-        }
+        print(f"  [OCR] ❌ Image decode error: {e}")
+
+    # ── All methods failed ───────────────────────────────────────────────────
+    return {
+        "success": False,
+        "error": (
+            "OCR failed. Set GROQ_API_KEY in .env (recommended) "
+            "or install Tesseract/EasyOCR as fallback."
+        ),
+        "text": "",
+        "setup_guide": {
+            "recommended": "Set GROQ_API_KEY in your .env file (free at console.groq.com)",
+            "option1": "Install Tesseract: https://github.com/UB-Mannheim/tesseract/wiki",
+            "option2": "pip install easyocr (100MB download on first use)",
+        },
+    }
 
 
 

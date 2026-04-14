@@ -1748,6 +1748,47 @@ async def session_upload_notes(session_id: str, request: Request, x_api_key: str
 
 
 
+@app.post("/api/ocr/extract",
+    summary="Extract text from an image using OCR (standalone, no session needed)",
+    tags=["AI Features"])
+async def ocr_extract(request: Request, x_api_key: str = Header(default="")):
+    if not AI_FEATURES_AVAILABLE:
+        return JSONResponse({"error": "AI features are not available"}, status_code=503)
+    user = await require_api_auth(request, x_api_key)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+    try:
+        body = await request.json()
+    except Exception as e:
+        return JSONResponse({"success": False, "error": f"Invalid JSON: {e}"}, status_code=400)
+
+    image_base64 = body.get("image_data", "")
+    file_type = body.get("file_type", "image/png")
+
+    if not image_base64:
+        return JSONResponse({"success": False, "error": "No image data provided"}, status_code=400)
+
+    ocr_result = await process_ocr_from_image(image_base64, file_type)
+
+    if not ocr_result.get("success"):
+        response_data = {
+            "success": False,
+            "error": ocr_result.get("error", "OCR processing failed"),
+        }
+        if "setup_guide" in ocr_result:
+            response_data["setup_guide"] = ocr_result["setup_guide"]
+        return JSONResponse(response_data, status_code=400)
+
+    return JSONResponse({
+        "success": True,
+        "extracted_text": ocr_result.get("text", ""),
+        "character_count": ocr_result.get("character_count", 0),
+        "confidence": ocr_result.get("confidence", "medium"),
+        "method": ocr_result.get("method", "unknown"),
+    })
+
+
 @app.get("/api/sessions/suggest-folder",
     summary="Get folder suggestion for session",
     tags=["Sessions"])

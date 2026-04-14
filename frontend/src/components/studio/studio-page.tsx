@@ -841,7 +841,7 @@ export function StudioPageClient() {
           return;
         }
         try {
-          const response = await fetch(`/api/sessions/${detail.session_id}/upload-notes`, {
+          const response = await fetch(`/api/proxy/sessions/${detail.session_id}/upload-notes`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
