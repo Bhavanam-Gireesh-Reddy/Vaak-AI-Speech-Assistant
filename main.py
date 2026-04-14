@@ -100,7 +100,7 @@ FRONTEND_URL   = os.getenv("FRONTEND_URL",   "").rstrip("/")
 
 SAMPLE_RATE   = 16000
 CHANNELS      = 1
-CHUNK_BYTES   = int(SAMPLE_RATE * 0.25 * 2)   # 250ms chunks (was 500ms) — lower latency for Indic languages
+CHUNK_BYTES   = int(SAMPLE_RATE * 0.5 * 2)    # 500ms chunks — stable for all languages
 # Sentence-end punctuation: Latin (.!?) + Hindi danda (।) + double danda (॥)
 # + Telugu/Kannada/Malayalam full stop (.) in their Sarvam output
 SENTENCE_ENDS = re.compile(r'[.!?।॥]\s*$')
@@ -1369,10 +1369,11 @@ async def translate_ws(client_ws: WebSocket):
     pcm_buffer     = bytearray()
     session_active = True
 
-    # Indic languages need a shorter idle timeout because sentence-end punctuation
-    # is less reliable from the STT — flush sooner to avoid losing lines.
-    is_indic_lang  = language_code not in ("en-IN",)
-    idle_timeout   = 0.8 if is_indic_lang else 1.5
+    # Languages where Sarvam STT sentence-end punctuation is least reliable
+    # get a shorter idle flush timeout to avoid losing lines.
+    # Hindi (hi-IN) and English (en-IN) work well at 1.5s — leave them alone.
+    _FAST_FLUSH_LANGS = {"te-IN", "kn-IN", "ml-IN", "or-IN"}
+    idle_timeout = 0.8 if language_code in _FAST_FLUSH_LANGS else 1.5
 
     print(f"[Session] {session_id} started | mode={mode} lang={language_code} idle_timeout={idle_timeout}s")
 
