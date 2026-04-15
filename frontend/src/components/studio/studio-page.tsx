@@ -16,7 +16,6 @@ import {
   RefreshCcw,
   Search,
   Sparkles,
-  Video,
   CheckSquare,
   Upload,
 } from "lucide-react";
@@ -513,17 +512,10 @@ export function StudioPageClient() {
   const [translationTarget, setTranslationTarget] = useState("same");
   const [chatInput, setChatInput] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [youtubeUrl, setYoutubeUrl] = useState("");
-  const [youtubeBrowser, setYoutubeBrowser] = useState("");
-  const [youtubeCookies, setYoutubeCookies] = useState("");
   const [busyKey, setBusyKey] = useState("");
   const [error, setError] = useState("");
   const [flashcardIndex, setFlashcardIndex] = useState(0);
   const [quizIndex, setQuizIndex] = useState(0);
-  const [isHostedEnvironment, setIsHostedEnvironment] = useState(false);
-  const [youtubeStatus, setYoutubeStatus] = useState(
-    "Import a YouTube transcript and turn it into a normal study session.",
-  );
   const deferredSearch = useDeferredValue(search);
 
   const filteredSessions = sessions.filter((session) => {
@@ -715,41 +707,6 @@ export function StudioPageClient() {
     } catch (chatError) {
       setChatHistory(previousHistory);
       setError(chatError instanceof Error ? chatError.message : "Chat failed.");
-    } finally {
-      setBusyKey("");
-    }
-  }
-
-  async function importYouTubeSession() {
-    if (!youtubeUrl.trim()) {
-      setError("Paste a YouTube URL first.");
-      return;
-    }
-    setBusyKey("youtube");
-    setError("");
-    setYoutubeStatus("Importing transcript and creating a study session...");
-    try {
-      const response = await fetch("/api/proxy/youtube/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: youtubeUrl.trim(),
-          auth_browser: youtubeBrowser,
-          cookies_content: youtubeBrowser === "paste" ? youtubeCookies.trim() : "",
-        }),
-      });
-      const payload = await readJson<{ session_id: string }>(response);
-      setYoutubeUrl("");
-      setYoutubeCookies("");
-      await loadSessions(payload.session_id);
-      setYoutubeStatus(
-        "Import a YouTube transcript and turn it into a normal study session.",
-      );
-    } catch (importError) {
-      const message =
-        importError instanceof Error ? importError.message : "Import failed.";
-      setError(message);
-      setYoutubeStatus(message);
     } finally {
       setBusyKey("");
     }
@@ -971,7 +928,7 @@ export function StudioPageClient() {
             style={{ color: "rgba(255,255,255,0.45)" }}
           >
             Browse sessions, generate AI artifacts, chat with your transcript,
-            translate to any language, and import from YouTube — all wired to your
+            translate to any language — all wired to your
             existing backend.
           </p>
         </div>
@@ -992,107 +949,9 @@ export function StudioPageClient() {
       ) : null}
 
       {/* ══════════════════════════════════════════════════════════════════
-          ROW 1 — YouTube Import  |  Sessions list
+          ROW 1 — Sessions list
       ══════════════════════════════════════════════════════════════════ */}
       <section className="grid gap-5">
-        {/* YouTube import */}
-        <StudioCard
-          subtitle={youtubeStatus}
-          title="YouTube import"
-          actions={
-            <ActionButton busy={busyKey === "youtube"} onClick={importYouTubeSession} primary>
-              <Video className="h-4 w-4" />
-              Import
-            </ActionButton>
-          }
-        >
-          <div className="space-y-3">
-            <select
-              className="h-11 w-full rounded-2xl px-4 text-sm outline-none transition"
-              style={SELECT_STYLE}
-              onChange={(e) => setYoutubeBrowser(e.target.value)}
-              value={youtubeBrowser}
-            >
-              <option value="">No sign-in</option>
-              <option disabled={isHostedEnvironment} value="chrome">Use Chrome cookies{isHostedEnvironment ? " (local only)" : ""}</option>
-              <option disabled={isHostedEnvironment} value="edge">Use Edge cookies{isHostedEnvironment ? " (local only)" : ""}</option>
-              <option disabled={isHostedEnvironment} value="firefox">Use Firefox cookies{isHostedEnvironment ? " (local only)" : ""}</option>
-              <option disabled={isHostedEnvironment} value="brave">Use Brave cookies{isHostedEnvironment ? " (local only)" : ""}</option>
-              <option disabled={isHostedEnvironment} value="safari">Use Safari cookies{isHostedEnvironment ? " (local only)" : ""}</option>
-              <option value="paste">Paste cookies</option>
-            </select>
-            {isHostedEnvironment ? (
-              <div className="rounded-2xl px-4 py-3 text-sm leading-6"
-                style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)", color: "#fde68a" }}>
-                <p className="mb-1">
-                  YouTube blocks requests from cloud servers. Use{" "}
-                  <span className="font-semibold">Paste cookies</span> for reliable imports.
-                </p>
-              </div>
-            ) : null}
-            {youtubeBrowser === "paste" ? (
-              <>
-                <textarea
-                  className="min-h-[90px] w-full rounded-2xl px-4 py-3 text-sm outline-none transition placeholder:text-white/25"
-                  style={INPUT_STYLE}
-                  onChange={(e) => setYoutubeCookies(e.target.value)}
-                  placeholder="Paste Netscape-format cookies here (see instructions below)"
-                  value={youtubeCookies}
-                />
-                <details
-                  className="rounded-2xl px-4 py-3 text-xs leading-5 cursor-pointer"
-                  style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.15)", color: "rgba(255,255,255,0.55)" }}
-                >
-                  <summary className="font-semibold text-violet-300 select-none">
-                    How to get YouTube cookies (step-by-step)
-                  </summary>
-                  <div className="mt-3 space-y-3">
-                    <div>
-                      <p className="font-semibold text-violet-300 mb-1">Option 1: Browser Extension (Easiest)</p>
-                      <ol className="list-decimal ml-4 space-y-1">
-                        <li>Install the <strong>&quot;Get cookies.txt LOCALLY&quot;</strong> extension:
-                          <br />Chrome/Edge/Brave: Search &quot;Get cookies.txt LOCALLY&quot; in Chrome Web Store
-                          <br />Firefox: Search in Firefox Add-ons
-                        </li>
-                        <li>Go to <strong>youtube.com</strong> and make sure you are signed in</li>
-                        <li>Click the extension icon in your browser toolbar</li>
-                        <li>Click <strong>&quot;Export&quot;</strong> or <strong>&quot;Get cookies for this tab&quot;</strong></li>
-                        <li>Copy all the text and paste it in the box above</li>
-                      </ol>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-violet-300 mb-1">Option 2: Browser DevTools</p>
-                      <ol className="list-decimal ml-4 space-y-1">
-                        <li>Go to <strong>youtube.com</strong> (make sure you are signed in)</li>
-                        <li>Press <strong>F12</strong> to open DevTools</li>
-                        <li>Go to the <strong>Application</strong> tab (Chrome) or <strong>Storage</strong> tab (Firefox)</li>
-                        <li>Click <strong>Cookies</strong> &rarr; <strong>https://www.youtube.com</strong></li>
-                        <li>You need to convert these to Netscape format — use the extension method instead for easier results</li>
-                      </ol>
-                    </div>
-                    <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.03)" }}>
-                      <p className="font-semibold text-white/60 mb-1">What the cookies look like:</p>
-                      <pre className="text-[10px] text-white/40 overflow-x-auto whitespace-pre">
-{`# Netscape HTTP Cookie File
-.youtube.com	TRUE	/	TRUE	0	SID	abc123...
-.youtube.com	TRUE	/	TRUE	0	HSID	def456...
-.youtube.com	TRUE	/	TRUE	0	LOGIN_INFO	ghi789...`}
-                      </pre>
-                    </div>
-                  </div>
-                </details>
-              </>
-            ) : null}
-            <input
-              className="h-11 w-full rounded-2xl px-4 text-sm outline-none transition placeholder:text-white/25"
-              style={INPUT_STYLE}
-              onChange={(e) => setYoutubeUrl(e.target.value)}
-              placeholder="Paste a YouTube URL"
-              value={youtubeUrl}
-            />
-          </div>
-        </StudioCard>
-
         {/* Sessions list */}
         <StudioCard
           title="Sessions"
@@ -1160,11 +1019,7 @@ export function StudioPageClient() {
           ══════════════════════════════════════════════════════════════════ */}
           <section className="grid gap-5">
             <StudioCard
-              subtitle={
-                detail.source_type === "youtube"
-                  ? `Imported from YouTube${detail.source_channel ? ` via ${detail.source_channel}` : ""}.`
-                  : "Transcript-derived study workspace for this saved session."
-              }
+              subtitle="Transcript-derived study workspace for this saved session."
               title={detail.title || "Untitled session"}
             >
               <div className="flex flex-wrap gap-2 text-xs">

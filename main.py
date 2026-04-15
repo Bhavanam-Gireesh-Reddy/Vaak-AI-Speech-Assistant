@@ -83,7 +83,6 @@ try:
     from ai_features import (
         analyze_sentiment_text,
         apply_custom_vocabulary,
-        build_youtube_session,
         chat_with_transcript,
         extract_action_items,
         generate_flashcards,
@@ -711,68 +710,6 @@ async def session_chat(session_id: str, body: dict, request: Request, x_api_key:
     await db_collection.update_one({"session_id": session_id, "user_id": _user.get("sub", "")}, {"$set": {"chat_history": new_history}})
     
     return JSONResponse({"answer": answer, "chat_history": new_history})
-
-
-@app.post("/api/youtube/import")
-async def youtube_import(body: dict, request: Request, x_api_key: str = Header(default="")):
-    if db_collection is None:
-        return JSONResponse({"error": "MongoDB not connected"}, status_code=503)
-    user = await get_authenticated_user(request, x_api_key)
-    if not user:
-        return JSONResponse({"error": "Unauthorized"}, status_code=401)
-
-    url = (body.get("url") or "").strip()
-    auth_browser = (body.get("auth_browser") or "").strip()
-    cookies_content = (body.get("cookies_content") or "").strip()
-    if not url:
-        return JSONResponse({"error": "YouTube URL is required"}, status_code=400)
-    if auth_browser and auth_browser != "paste" and is_deployed_environment():
-        return JSONResponse(
-            {
-                "error": (
-                    "Browser cookie import only works on a local machine where that browser is installed. "
-                    "On the deployed app, use 'Paste cookies' or 'No sign-in'."
-                )
-            },
-            status_code=400,
-        )
-
-    try:
-        yt_data = await build_youtube_session(url, auth_browser, cookies_content)
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=400)
-
-    imported = yt_data["imported"]
-    analysis = yt_data["analysis"]
-    session_id = "yt_" + datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
-    started_at = datetime.now(timezone.utc)
-    user_id = user.get("sub", "")
-    final_title = await resolve_title(analysis.get("title") or imported.get("title") or "YouTube Import", user_id)
-
-    await save_to_mongo(
-        session_id,
-        started_at,
-        imported.get("language") or "youtube",
-        "youtube",
-        yt_data["sentences"],
-        analysis.get("filtered_transcript", ""),
-        analysis.get("summary", ""),
-        analysis.get("corrected_transcript", imported.get("transcript", "")),
-        final_title,
-        analysis.get("notes", ""),
-        user_id,
-        analysis.get("speakers", []),
-        extra_fields={
-            "source_type": "youtube",
-            "source_url": imported.get("webpage_url", url),
-            "source_channel": imported.get("channel", ""),
-            "thumbnail": imported.get("thumbnail", ""),
-            "description": imported.get("description", ""),
-            "sentiment_timeline": yt_data.get("sentiment_timeline", []),
-            "sentiment_summary": summarize_sentiment_timeline(yt_data.get("sentiment_timeline", [])),
-        },
-    )
-    return JSONResponse({"ok": True, "session_id": session_id, "title": final_title})
 
 
 # ── Meeting Integrations ────────────────────────────────────────────────────

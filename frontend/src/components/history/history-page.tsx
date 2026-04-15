@@ -307,7 +307,6 @@ export function HistoryPage() {
             <option value="transcribe">Transcribe</option>
             <option value="translate">Translate</option>
             <option value="codemix">Codemix</option>
-            <option value="youtube">YouTube</option>
           </select>
 
           <select

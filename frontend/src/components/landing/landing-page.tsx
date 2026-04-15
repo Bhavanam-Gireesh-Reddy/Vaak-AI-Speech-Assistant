@@ -14,7 +14,6 @@ import {
   ScrollText,
   Sparkles,
   Users,
-  Video,
   Wand2,
   Zap,
 } from "lucide-react";
@@ -29,7 +28,6 @@ const FEATURE_PILLS = [
   "AI Studio",
   "Flashcards",
   "Mind Maps",
-  "YouTube Import",
   "OCR Notes",
   "Sentiment Analysis",
   "Speaker Detection",
@@ -70,7 +68,6 @@ const STUDIO_TOOLS = [
   { icon: MessageSquare, label: "Transcript Chat", color: "text-rose-400", bg: "bg-rose-500/10" },
   { icon: Headphones, label: "Podcast Script", color: "text-amber-400", bg: "bg-amber-500/10" },
   { icon: FileText, label: "Quiz Deck", color: "text-cyan-400", bg: "bg-cyan-500/10" },
-  { icon: Video, label: "YouTube Import", color: "text-pink-400", bg: "bg-pink-500/10" },
   { icon: Wand2, label: "OCR Notes", color: "text-teal-400", bg: "bg-teal-500/10" },
 ];
 

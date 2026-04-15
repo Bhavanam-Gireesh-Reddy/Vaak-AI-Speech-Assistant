@@ -9,7 +9,6 @@ Enterprise-grade real-time speech transcription, translation, and intelligent se
 - ✅ **AI Study Notes & Exports** — auto-generates structured notes and allows one-click export to PDF, DOC, and TXT.
 - ✅ **AI Studio** — generate interactive flashcards & quizzes (with animated carousel UI), podcast scripts, mind maps, multi-language outputs, and grounded transcript chat.
 - ✅ **Rich Markdown Notes** — auto-extracts comprehensive and detailed study notes complete with Markdown tables, LaTeX equations, and Mermaid diagrams based strictly on technical content.
-- ✅ **YouTube Transcript Import** — pull captioned YouTube videos into the same study workflow, bypassing aggressive bot protections using local browser cookies.
 - ✅ **Speaker identification** — inferred multi-speaker turns shown in live analysis and saved sessions
 - ✅ **Real-time sentiment analysis** — live tone tracking across captured transcript segments
 - ✅ **Custom vocabulary support** — bias and normalize terminology with per-session word mappings
@@ -431,7 +430,6 @@ For issues, suggestions, or contributions:
 - [x] Chat with your transcript
 - [x] Mind Maps (Mermaid format)
 - [x] Rich Notes (Tables & Equations)
-- [x] YouTube video import (with auth bypass via cookies)
 - [ ] Mobile app (React Native)
 - [ ] Docker containerization
 

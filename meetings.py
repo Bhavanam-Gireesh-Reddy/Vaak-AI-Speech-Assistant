@@ -491,7 +491,7 @@ async def process_meeting_transcript(
 ) -> dict[str, Any]:
     """
     Process a meeting transcript through the AI pipeline.
-    Uses the same flow as YouTube/live transcription — sentence splitting,
+    Uses the same flow as live transcription — sentence splitting,
     LLM analysis, sentiment timeline.
     """
     from ai_features import (
