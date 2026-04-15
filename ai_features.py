@@ -704,17 +704,28 @@ def _fetch_transcript_via_api(video_id: str, cookies_content: str = "") -> tuple
     ]
 
     try:
-        ytt = YouTubeTranscriptApi()
-        kwargs = {}
+        # Build an http_client with cookies if provided
+        http_client = None
         if cookies_content:
-            # Write cookies to a temp file for the API
-            import tempfile as _tf
-            tmp = _tf.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, prefix="yt_cookies_")
-            tmp.write(cookies_content)
-            tmp.close()
-            kwargs["cookies"] = tmp.name
+            import http.cookiejar
+            import requests
+            cookie_file = Path(tempfile.mktemp(suffix=".txt", prefix="yt_cookies_"))
+            cookie_file.write_text(cookies_content)
+            try:
+                cj = http.cookiejar.MozillaCookieJar(str(cookie_file))
+                cj.load(ignore_discard=True, ignore_expires=True)
+                session = requests.Session()
+                session.cookies = cj
+                http_client = session
+                print(f"  [YouTube] Loaded {len(cj)} cookies for transcript API")
+            except Exception as cookie_err:
+                print(f"  [YouTube] Cookie loading failed: {cookie_err}")
+            finally:
+                cookie_file.unlink(missing_ok=True)
 
-        transcript_list = ytt.list(video_id, **kwargs)
+        ytt = YouTubeTranscriptApi(http_client=http_client) if http_client else YouTubeTranscriptApi()
+
+        transcript_list = ytt.list(video_id)
 
         # Build a lookup by language code for fast matching
         manual_by_lang = {}
@@ -743,7 +754,7 @@ def _fetch_transcript_via_api(video_id: str, cookies_content: str = "") -> tuple
             best = first_available
 
         if best:
-            result = ytt.fetch(video_id, languages=[best.language_code], **kwargs)
+            result = ytt.fetch(video_id, languages=[best.language_code])
             full_text = " ".join(entry.text for entry in result)
             # Clean up bracket notation like [Music], [Applause] and ♪ symbols
             full_text = re.sub(r'\[♪+\]', '', full_text)
