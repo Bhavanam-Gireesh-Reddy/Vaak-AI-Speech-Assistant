@@ -535,13 +535,6 @@ export function StudioPageClient() {
   });
 
   useEffect(() => {
-    setIsHostedEnvironment(
-      typeof window !== "undefined" &&
-        !["localhost", "127.0.0.1"].includes(window.location.hostname),
-    );
-  }, []);
-
-  useEffect(() => {
     async function initializeStudio() {
       try {
         const response = await fetch("/api/sessions", { cache: "no-store" });
