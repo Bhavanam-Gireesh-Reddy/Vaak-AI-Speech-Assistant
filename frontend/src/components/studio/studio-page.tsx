@@ -1640,12 +1640,44 @@ export function StudioPageClient() {
                                   {(note.confidence || "medium").toUpperCase()}
                                 </span>
                               </div>
-                              <p
-                                className="text-xs mb-2"
-                                style={{ color: "rgba(255,255,255,0.35)" }}
-                              >
-                                Type: {note.file_type} • Characters: {(note.text || "").length}
-                              </p>
+                              <div className="flex items-center justify-between mb-2">
+                                <p
+                                  className="text-xs"
+                                  style={{ color: "rgba(255,255,255,0.35)" }}
+                                >
+                                  Type: {note.file_type} • Characters: {(note.text || "").length}
+                                </p>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(note.text || "");
+                                    }}
+                                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium transition-all hover:bg-white/10"
+                                    style={{ color: "rgba(255,255,255,0.5)" }}
+                                    title="Copy text"
+                                  >
+                                    <Copy className="h-3 w-3" />
+                                    Copy
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const blob = new Blob([note.text || ""], { type: "text/plain" });
+                                      const url = URL.createObjectURL(blob);
+                                      const a = document.createElement("a");
+                                      a.href = url;
+                                      a.download = `ocr-notes-${new Date(note.timestamp).toISOString().slice(0, 10)}.txt`;
+                                      a.click();
+                                      URL.revokeObjectURL(url);
+                                    }}
+                                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium transition-all hover:bg-white/10"
+                                    style={{ color: "rgba(255,255,255,0.5)" }}
+                                    title="Download as text file"
+                                  >
+                                    <Download className="h-3 w-3" />
+                                    Download
+                                  </button>
+                                </div>
+                              </div>
                               <p
                                 className="text-sm break-words whitespace-pre-wrap"
                                 style={{ color: "rgba(255,255,255,0.65)" }}
