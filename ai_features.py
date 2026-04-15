@@ -822,27 +822,23 @@ def import_youtube_transcript(url: str, auth_browser: str = "", cookies_content:
         elif cookies_file:
             ydl_opts["cookiefile"] = str(cookies_file)
 
+        # Step 1 — fetch metadata via yt-dlp (non-fatal if it fails)
         info = None
+        ydl_failed = False
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
         except Exception as e:
-            err = str(e).lower()
-            if "sign in" in err or "bot" in err or "captcha" in err:
-                raise RuntimeError(
-                    "YouTube is blocking this request. Try pasting browser cookies "
-                    "or use a different video."
-                ) from e
-            raise RuntimeError(f"Could not fetch YouTube video: {e}") from e
+            print(f"  [YouTube] yt-dlp metadata fetch failed: {e}")
+            ydl_failed = True
 
-        if not info:
-            raise RuntimeError("Could not fetch YouTube metadata. The video might be private or restricted.")
-
-        video_id = info.get("id") or _extract_video_id(url)
+        video_id = (info.get("id") if info else None) or _extract_video_id(url)
         if not video_id:
-            raise RuntimeError("Missing YouTube video ID in response.")
+            raise RuntimeError(
+                "Could not extract video ID from URL. Please check the YouTube link."
+            )
 
-        # Step 2 — try youtube_transcript_api first (reliable, no PO Token needed)
+        # Step 2 — try youtube_transcript_api first (reliable, works from data centers)
         transcript_text = ""
         picked_language = ""
 
@@ -852,6 +848,16 @@ def import_youtube_transcript(url: str, auth_browser: str = "", cookies_content:
         )
         if transcript_text:
             print(f"  [YouTube] Got {len(transcript_text)} chars via transcript API (lang={picked_language})")
+            # If yt-dlp failed but transcript API worked, build minimal info
+            if not info:
+                info = {
+                    "title": "YouTube Import",
+                    "channel": "",
+                    "webpage_url": url,
+                    "thumbnail": f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
+                    "duration": 0,
+                    "description": "",
+                }
 
         # Step 2b — fallback: try yt-dlp VTT subtitles
         if not transcript_text:
@@ -917,6 +923,13 @@ def import_youtube_transcript(url: str, auth_browser: str = "", cookies_content:
                 with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl_audio:
                     ydl_audio.extract_info(url, download=True)
             except Exception as e:
+                err_lower = str(e).lower()
+                if "sign in" in err_lower or "bot" in err_lower or "captcha" in err_lower:
+                    raise RuntimeError(
+                        "YouTube is blocking this request from the server. "
+                        "Try using 'Paste cookies' option with your browser cookies, "
+                        "or try a different video."
+                    ) from e
                 raise RuntimeError(
                     f"No subtitles available and audio download failed: {e}"
                 ) from e
@@ -990,6 +1003,8 @@ def import_youtube_transcript(url: str, auth_browser: str = "", cookies_content:
                     "No subtitles found and audio transcription failed."
                 )
 
+        if not info:
+            info = {}
         return {
             "title": info.get("title") or "YouTube Import",
             "channel": info.get("channel") or info.get("uploader") or "",
