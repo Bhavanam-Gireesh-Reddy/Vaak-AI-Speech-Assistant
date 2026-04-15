@@ -779,10 +779,10 @@ async def youtube_import(body: dict, request: Request, x_api_key: str = Header(d
 
 def _get_tokens_col():
     """Get meeting_tokens collection, or None if MongoDB unavailable."""
-    if mongo_client is None:
+    if db_client is None:
         return None
     try:
-        return mongo_client[MONGO_DB]["meeting_tokens"]
+        return db_client[MONGO_DB]["meeting_tokens"]
     except Exception:
         return None
 
