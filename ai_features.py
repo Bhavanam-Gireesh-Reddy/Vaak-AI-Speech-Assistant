@@ -50,6 +50,10 @@ NEGATIVE_WORDS = {
 
 
 def has_llm_access() -> bool:
+    openrouter = os.getenv("OPENROUTER_API_KEY", "")
+    if openrouter and openrouter not in ("", "YOUR_OPENROUTER_API_KEY_HERE"):
+        return True
+    # Fallback: check Groq key for vision features
     return os.getenv("GROQ_API_KEY", "") not in ("", "YOUR_GROQ_API_KEY_HERE")
 
 

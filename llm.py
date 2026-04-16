@@ -1,7 +1,7 @@
 """
-Groq LLM helper
-- Single call on session stop: summary + filtered + corrected + title + speakers
-- Model: llama-3.3-70b-versatile (free, fast, 14400 req/day)
+LLM helper — OpenRouter (Gemma 4) for text, Groq for vision
+- Text model : google/gemma-4-31b-it:free via OpenRouter
+- Vision model: meta-llama/llama-4-scout-17b-16e-instruct via Groq
 """
 
 import os
@@ -16,26 +16,29 @@ try:
 except ImportError:
     pass
 
-GROQ_URL   = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.3-70b-versatile"
+# ── OpenRouter (text LLM) ────────────────────────────────────────────────────
+OPENROUTER_URL   = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemma-4-31b-it:free")
 
-# Read lazily so load_dotenv() in main.py always wins
-def _api_key() -> str:
+def _openrouter_key() -> str:
+    return os.getenv("OPENROUTER_API_KEY", "")
+
+# ── Groq (vision only) ───────────────────────────────────────────────────────
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+def _groq_key() -> str:
     return os.getenv("GROQ_API_KEY", "")
 
-# These are set by main.py after startup — kept for backward compatibility
+# Backward compat — kept so main.py doesn't break if it sets these
 GROQ_API_KEY = ""
-HEADERS = {
-    "Authorization": f"Bearer {GROQ_API_KEY}",
-    "Content-Type":  "application/json",
-}
+GROQ_MODEL = OPENROUTER_MODEL  # alias for any code that reads this
 
 
 async def call_groq(prompt: str, system: str, max_tokens: int = 2000) -> str:
-    """Single call to Groq API. Reads API key from env at call time."""
-    api_key = _api_key() or GROQ_API_KEY   # prefer env, fall back to module var
+    """Call OpenRouter API (Gemma 4). Reads API key from env at call time."""
+    api_key = _openrouter_key()
     if not api_key:
-        print("  [Groq] ❌ GROQ_API_KEY not set — check your .env file")
+        print("  [LLM] ❌ OPENROUTER_API_KEY not set — check your .env file")
         return ""
 
     headers = {
@@ -43,7 +46,7 @@ async def call_groq(prompt: str, system: str, max_tokens: int = 2000) -> str:
         "Content-Type":  "application/json",
     }
     payload = {
-        "model":      GROQ_MODEL,
+        "model":      OPENROUTER_MODEL,
         "max_tokens": max_tokens,
         "messages": [
             {"role": "system", "content": system},
@@ -52,25 +55,25 @@ async def call_groq(prompt: str, system: str, max_tokens: int = 2000) -> str:
     }
 
     try:
-        print(f"  [Groq] Calling {GROQ_MODEL}...")
+        print(f"  [LLM] 🔷 Calling {OPENROUTER_MODEL} via OpenRouter...")
         async with httpx.AsyncClient(timeout=60) as client:
-            res = await client.post(GROQ_URL, headers=headers, json=payload)
+            res = await client.post(OPENROUTER_URL, headers=headers, json=payload)
 
             if res.status_code == 429:
-                print("  [Groq] ⚠️  429 rate limit — try again in a moment")
+                print(f"  [LLM] ⚠️  429 rate limit on {OPENROUTER_MODEL} — try again in a moment")
                 return ""
 
             res.raise_for_status()
             data    = res.json()
             content = data["choices"][0]["message"]["content"].strip()
-            print(f"  [Groq] ✅ Response received ({len(content)} chars)")
+            print(f"  [LLM] ✅ {OPENROUTER_MODEL} responded ({len(content)} chars)")
             return content
 
     except httpx.HTTPStatusError as e:
-        print(f"  [Groq] HTTP error {e.response.status_code}: {e.response.text[:200]}")
+        print(f"  [LLM] HTTP error {e.response.status_code}: {e.response.text[:200]}")
         return ""
     except Exception as e:
-        print(f"  [Groq] Error: {e}")
+        print(f"  [LLM] Error: {e}")
         return ""
 
 
@@ -79,7 +82,7 @@ _GROQ_VISION_MAX_B64 = 4 * 1024 * 1024  # Groq limit: 4MB base64
 
 async def call_groq_vision(image_base64: str, file_type: str = "image/png", prompt: str = "", system: str = "") -> str:
     """Send an image to Groq Vision API (Llama 4 Scout) for OCR / image understanding."""
-    api_key = _api_key() or GROQ_API_KEY
+    api_key = _groq_key() or GROQ_API_KEY
     if not api_key:
         print("  [Groq Vision] ❌ GROQ_API_KEY not set")
         return ""
@@ -187,7 +190,7 @@ async def process_session(sentences: list) -> dict:
         return empty
 
     text = " ".join(sentences)
-    print(f"  [Groq] Processing {len(sentences)} sentences ({len(text)} chars)...")
+    print(f"  [LLM] Processing {len(sentences)} sentences ({len(text)} chars) with {OPENROUTER_MODEL}...")
 
     result = await call_groq(
         f"Analyze this transcript:\n\n{text}",
@@ -221,7 +224,7 @@ async def process_session(sentences: list) -> dict:
         speakers  = data.get("speakers",  [])
         notes     = data.get("notes",     "")
 
-        print(f"  [Groq] ✅ Title:'{title}' Speakers:{len(speakers)} Notes:{len(notes)} chars Summary:{len(summary)} chars")
+        print(f"  [LLM] ✅ {OPENROUTER_MODEL} → Title:'{title}' Speakers:{len(speakers)} Notes:{len(notes)} chars Summary:{len(summary)} chars")
         return {
             "summary":              summary,
             "filtered_transcript":  filtered,
@@ -232,7 +235,7 @@ async def process_session(sentences: list) -> dict:
         }
 
     except Exception as e:
-        print(f"  [Groq] JSON parse error: {e} — trying regex fallback...")
+        print(f"  [LLM] JSON parse error: {e} — trying regex fallback...")
         try:
             sm_match = re.search(r'"summary"\s*:\s*"(.*?)"(?=\s*,)',              result, re.DOTALL)
             ft_match = re.search(r'"filtered_transcript"\s*:\s*"(.*?)"(?=\s*[,}])', result, re.DOTALL)
@@ -246,7 +249,7 @@ async def process_session(sentences: list) -> dict:
             title     = ti_match.group(1)                       if ti_match else ""
             notes     = nt_match.group(1).replace("\\n", "\n") if nt_match else ""
 
-            print(f"  [Groq] Regex fallback — title:'{title}' notes:{len(notes)} chars summary:{len(summary)} chars")
+            print(f"  [LLM] Regex fallback — title:'{title}' notes:{len(notes)} chars summary:{len(summary)} chars")
             return {
                 "summary":              summary,
                 "filtered_transcript":  filtered,
@@ -256,7 +259,7 @@ async def process_session(sentences: list) -> dict:
                 "notes":                notes,
             }
         except Exception as e2:
-            print(f"  [Groq] Regex fallback failed: {e2}")
+            print(f"  [LLM] Regex fallback failed: {e2}")
             return empty
 
 
