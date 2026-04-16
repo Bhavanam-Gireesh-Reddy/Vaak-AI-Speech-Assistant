@@ -16,7 +16,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "MeetWise AI",
+  title: "Vaak AI",
   description: "AI-powered real-time meeting transcription and summarization",
 };
 

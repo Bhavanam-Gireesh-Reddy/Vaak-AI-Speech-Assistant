@@ -86,10 +86,10 @@ export function AppShell({ children, user }: AppShellProps) {
               className="text-[10px] font-bold uppercase tracking-[0.22em] leading-none"
               style={{ color: "#00d4ff" }}
             >
-              MeetWise AI
+              Vaak AI
             </p>
             <p className="text-[13px] font-semibold text-white leading-tight mt-0.5">
-              Meeting Assistant
+              Speech Assistant
             </p>
           </div>
         </div>

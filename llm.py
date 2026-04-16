@@ -18,7 +18,9 @@ except ImportError:
 
 # ── Gemini API (text LLM) ────────────────────────────────────────────────────
 GEMINI_URL   = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+# Force gemini-2.5-flash — ignore stale .env values like gemma-4-31b-it
+_env_model = os.getenv("GEMINI_MODEL", "").strip()
+GEMINI_MODEL = _env_model if _env_model and not _env_model.startswith("gemma") else "gemini-2.5-flash"
 
 def _gemini_key() -> str:
     return os.getenv("GEMINI_API_KEY", "")
@@ -197,7 +199,7 @@ async def process_session(sentences: list) -> dict:
     result = await call_groq(
         f"Analyze this transcript:\n\n{text}",
         COMBINED_SYSTEM,
-        max_tokens=2000
+        max_tokens=4000
     )
 
     if not result:

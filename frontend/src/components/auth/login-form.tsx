@@ -123,7 +123,7 @@ export function LoginForm() {
         className="rounded-2xl px-4 py-3 text-sm"
         style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.45)" }}
       >
-        New to MeetWise AI?{" "}
+        New to Vaak AI?{" "}
         <Link className="font-semibold transition-colors hover:opacity-80" style={{ color: "#00d4ff" }} href="/register">
           Create your account
         </Link>

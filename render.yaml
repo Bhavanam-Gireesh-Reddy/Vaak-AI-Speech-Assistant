@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: meetwise-api
+    name: vaak-api
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
@@ -12,7 +12,7 @@ services:
       - key: FRONTEND_URL
         fromService:
           type: web
-          name: meetwise-frontend
+          name: vaak-frontend
           envVarKey: RENDER_EXTERNAL_URL
       - key: SARVAM_API_KEY
         sync: false
@@ -31,7 +31,7 @@ services:
       - key: SECRET_KEY
         generateValue: true
   - type: web
-    name: meetwise-frontend
+    name: vaak-frontend
     env: node
     plan: free
     rootDir: frontend
@@ -44,5 +44,5 @@ services:
       - key: BACKEND_URL
         fromService:
           type: web
-          name: meetwise-api
+          name: vaak-api
           envVarKey: RENDER_EXTERNAL_URL

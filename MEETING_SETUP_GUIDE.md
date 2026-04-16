@@ -20,7 +20,7 @@ This guide walks you through getting API keys for Zoom, Google Calendar, and Web
 2. **Create an OAuth App**
    - Click **Develop** (top-right) > **Build App**
    - Select **General App** > **Create**
-   - Give it a name (e.g., "MeetWise Transcription")
+   - Give it a name (e.g., "Vaak AI Transcription")
 
 3. **Configure OAuth Settings**
    - In the app settings, go to **OAuth** section
@@ -79,7 +79,7 @@ This guide walks you through getting API keys for Zoom, Google Calendar, and Web
 
 2. **Create a Project**
    - Click the project dropdown (top bar) > **New Project**
-   - Name it (e.g., "MeetWise")
+   - Name it (e.g., "Vaak AI")
    - Click **Create**
 
 3. **Enable Google Calendar API**
@@ -91,7 +91,7 @@ This guide walks you through getting API keys for Zoom, Google Calendar, and Web
    - Go to **APIs & Services** > **OAuth consent screen**
    - Choose **External** (for testing) or **Internal** (for organization)
    - Fill in the required fields:
-     - App name: "MeetWise"
+     - App name: "Vaak AI"
      - User support email: your email
      - Developer contact: your email
    - Click **Save and Continue**
@@ -105,7 +105,7 @@ This guide walks you through getting API keys for Zoom, Google Calendar, and Web
    - Go to **APIs & Services** > **Credentials**
    - Click **+ Create Credentials** > **OAuth Client ID**
    - Application type: **Web application**
-   - Name: "MeetWise Web Client"
+   - Name: "Vaak AI Web Client"
    - Add **Authorized redirect URI**: `http://localhost:3000/meetings?provider=google`
    - For production: add your deployed URL too
    - Click **Create**
@@ -148,7 +148,7 @@ This guide walks you through getting API keys for Zoom, Google Calendar, and Web
    - Choose **Integration**
 
 3. **Configure the Integration**
-   - Name: "MeetWise Transcription"
+   - Name: "Vaak AI Transcription"
    - Icon: upload any icon
    - Description: "Meeting transcription integration"
    - **Redirect URI**: `http://localhost:3000/meetings?provider=webex`

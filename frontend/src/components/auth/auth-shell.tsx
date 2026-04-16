@@ -98,7 +98,7 @@ export function AuthShell({
               >
                 <Mic2 className="h-4 w-4 text-white" />
               </span>
-              MeetWise AI
+              Vaak AI
             </div>
 
             <div className="space-y-5">

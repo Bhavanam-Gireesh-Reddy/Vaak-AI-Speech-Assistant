@@ -75,7 +75,7 @@ type WsMessage =
   | { type: "sentiment"; sentiment?: SentimentItem }
   | { type: "error"; message: string };
 
-const STORAGE_KEY_PREFIX = "sarvam_session";
+const STORAGE_KEY_PREFIX = "vaak_session";
 
 const SPEAKER_COLORS = [
   { bg: "rgba(0,212,255,0.12)", border: "rgba(0,212,255,0.35)", text: "#00d4ff" },

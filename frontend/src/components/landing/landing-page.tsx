@@ -74,7 +74,7 @@ const STUDIO_TOOLS = [
 const HOW_STEPS = [
   { number: "01", title: "Open Live workspace", body: "Select your language, pick a mode — translate, transcribe, codemix, or verbatim — then hit Start.", icon: Mic2 },
   { number: "02", title: "Speak naturally", body: "Your words appear in under 150ms. VAD detects silence, waveform pulses in real time.", icon: Zap },
-  { number: "03", title: "Get AI insights", body: "Session ends → Groq generates a title, summary, keywords, and full study notes automatically.", icon: Sparkles },
+  { number: "03", title: "Get AI insights", body: "Session ends → Gemini generates a title, summary, keywords, and full study notes automatically.", icon: Sparkles },
   { number: "04", title: "Explore in Studio", body: "Turn any saved session into flashcards, mind maps, quizzes, podcast scripts, or chat with it.", icon: BookOpen },
 ];
 
@@ -111,7 +111,7 @@ export function LandingPage({ isLoggedIn }: LandingPageProps) {
           >
             <Mic2 className="h-4 w-4 text-white" />
           </span>
-          <span className="text-sm font-bold tracking-tight text-white">MeetWise AI</span>
+          <span className="text-sm font-bold tracking-tight text-white">Vaak AI</span>
         </div>
 
         {/* Nav links */}
@@ -216,7 +216,7 @@ export function LandingPage({ isLoggedIn }: LandingPageProps) {
             className="h-1.5 w-1.5 rounded-full"
             style={{ background: "#00d4ff", boxShadow: "0 0 6px #00d4ff", animation: "pulse 2s ease-in-out infinite" }}
           />
-          Live · Sub-150ms · Sarvam AI · Groq LLM
+          Live · Sub-150ms · Sarvam AI · Gemini
         </div>
 
         {/* Headline */}
@@ -582,13 +582,13 @@ export function LandingPage({ isLoggedIn }: LandingPageProps) {
               </div>
               <h3 className="mb-2 text-lg font-bold text-white">Neural Processor</h3>
               <p className="mb-4 text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.45)" }}>
-                Sarvam AI Whisper-based model processes audio chunks. Groq LLM adds context, speaker detection and translation.
+                Sarvam AI processes audio chunks in real-time. Gemini adds context, speaker detection and study tools.
               </p>
               <div
                 className="rounded-xl px-3 py-2 font-mono text-xs"
                 style={{ background: "rgba(124,58,237,0.05)", border: "1px solid rgba(124,58,237,0.12)", color: "rgba(167,139,250,0.7)" }}
               >
-                Sarvam AI · Groq · &lt;150ms
+                Sarvam AI · Gemini · &lt;150ms
               </div>
             </div>
 
@@ -945,7 +945,7 @@ export function LandingPage({ isLoggedIn }: LandingPageProps) {
               <div className="px-5 py-4 font-mono text-[11px] leading-[1.7]" style={{ color: "#34d399" }}>
                 <p>
                   <span style={{ color: "rgba(52,211,153,0.45)" }}>$</span>{" "}
-                  <span style={{ color: "rgba(255,255,255,0.55)" }}>meetwise stream --session sws_a3f9b2c1</span>
+                  <span style={{ color: "rgba(255,255,255,0.55)" }}>vaak stream --session sws_a3f9b2c1</span>
                 </p>
                 <p className="mt-2" style={{ color: "rgba(52,211,153,0.4)" }}>{"{"}</p>
                 <p className="pl-4">
@@ -1328,10 +1328,10 @@ export function LandingPage({ isLoggedIn }: LandingPageProps) {
             >
               <Mic2 className="h-3.5 w-3.5 text-white" />
             </span>
-            <span className="text-sm font-bold text-white">MeetWise AI</span>
+            <span className="text-sm font-bold text-white">Vaak AI</span>
           </div>
           <p className="text-xs" style={{ color: "rgba(255,255,255,0.2)" }}>
-            Sarvam AI · Groq LLM · MongoDB · FastAPI · Next.js
+            Sarvam AI · Gemini · MongoDB · FastAPI · Next.js
           </p>
           <div className="flex gap-5 text-xs" style={{ color: "rgba(255,255,255,0.28)" }}>
             <Link href="/login" className="transition-colors hover:text-white">Sign in</Link>

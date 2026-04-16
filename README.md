@@ -1,4 +1,6 @@
-# MeetWise AI Meeting Assistant
+# Vaak AI — Speech Intelligence Platform
+
+> **Vaak** (वाक्) means "speech" in Sanskrit
 
 Real-time speech transcription, translation, and AI-powered study tools built with **Sarvam AI**, **Google Gemini**, and **Next.js**.
 
@@ -77,8 +79,8 @@ Live-transcribe lectures in 11 Indian languages, then auto-generate notes, flash
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/Bhavanam-Gireesh-Reddy/MeetWise-AI-Meeting-Assistant.git
-cd MeetWise-AI-Meeting-Assistant
+git clone https://github.com/Bhavanam-Gireesh-Reddy/Vaak-AI.git
+cd Vaak-AI
 
 # Backend
 pip install -r requirements.txt
@@ -152,7 +154,7 @@ npm run dev
 ## Project Structure
 
 ```
-MeetWise-AI-Meeting-Assistant/
+Vaak-AI/
 ├── main.py                 # FastAPI app, all API routes, WebSocket handler
 ├── llm.py                  # Gemini API (text) + Groq (vision) integration
 ├── ai_features.py          # AI tools: flashcards, quizzes, notes, OCR, sentiment

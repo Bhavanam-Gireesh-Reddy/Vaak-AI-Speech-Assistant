@@ -18,7 +18,7 @@ export default async function LoginPage() {
       alternateText="Need access for a new teammate?"
       description="Move from static templates to a more durable frontend foundation without sacrificing clarity, speed, or trust."
       eyebrow="Authentication"
-      title="A smarter way into your MeetWise AI workspace"
+      title="A smarter way into your Vaak AI workspace"
     >
       <LoginForm />
     </AuthShell>

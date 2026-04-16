@@ -223,8 +223,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Sarvam Live Transcription API",
-    description="Live speech transcription and translation powered by Sarvam AI",
+    title="Vaak AI API",
+    description="Live speech transcription, translation, and AI study tools powered by Sarvam AI and Gemini",
     version="1.0.0",
     lifespan=lifespan,
     docs_url="/api/docs",
@@ -295,7 +295,7 @@ async def health_check():
     return JSONResponse(
         {
             "ok": True,
-            "service": "meetwise-api",
+            "service": "vaak-api",
             "auth_available": bool(AUTH_AVAILABLE),
             "mongo_connected": db_collection is not None,
             "frontend_url_configured": bool(get_frontend_url()),
@@ -397,7 +397,7 @@ async def setup_page():
     """Bootstrap admin page — open this in browser to claim admin."""
     html = """<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
-<title>Admin Setup — Sarvam AI</title>
+<title>Admin Setup — Vaak AI</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#080c10;color:#e2eaf4;font-family:'Segoe UI',sans-serif;
@@ -1912,7 +1912,7 @@ async def translate_ws(client_ws: WebSocket):
                 pass
 
             if LLM_AVAILABLE and os.getenv("GEMINI_API_KEY", "") not in ("", "YOUR_GEMINI_API_KEY_HERE"):
-                print(f"  [LLM] Calling Gemma 4 via Gemini API...")
+                print(f"  [LLM] Calling {os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')} via Gemini API...")
                 result = await process_session(all_sentences)
             else:
                 print(f"  [LLM] Skipped — LLM_AVAILABLE={LLM_AVAILABLE}, GEMINI_API_KEY set={bool(os.getenv('GEMINI_API_KEY', ''))}")
