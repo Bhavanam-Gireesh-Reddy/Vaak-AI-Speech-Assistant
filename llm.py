@@ -18,7 +18,7 @@ except ImportError:
 
 # ── Gemini API (text LLM) ────────────────────────────────────────────────────
 GEMINI_URL   = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemma-4-31b-it")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 def _gemini_key() -> str:
     return os.getenv("GEMINI_API_KEY", "")
