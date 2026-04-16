@@ -625,6 +625,10 @@ export function StudioPageClient() {
         body: JSON.stringify({}),
       });
       const payload = await readJson<Record<string, unknown>>(response);
+      if (!response.ok || payload.error) {
+        setError((payload.error as string) || `Failed to generate ${kind}`);
+        return;
+      }
       if (kind === "flashcards") {
         setFlashcardIndex(0);
         updateDetail({ flashcards: (payload.flashcards as SessionDetail["flashcards"]) ?? [] });

@@ -1518,24 +1518,14 @@ async def v1_list_sessions(
     if db_collection is None:
         return JSONResponse({"error": "DB not connected"}, status_code=503)
     skip   = (page - 1) * limit
-    # Include sessions owned by this user AND orphaned sessions (empty user_id)
+    # Only return sessions owned by this user — never expose orphaned sessions
     if AUTH_AVAILABLE:
-        query = {"$or": [{"user_id": user["sub"]}, {"user_id": ""}]}
+        query = {"user_id": user["sub"]}
     else:
         query = {}
     cursor = db_collection.find(query, {"_id": 0, "sentences": 0}).sort("started_at", -1).skip(skip).limit(limit)
     total  = await db_collection.count_documents(query)
     items  = await cursor.to_list(length=limit)
-    # Claim orphaned sessions for this user so they show up correctly next time
-    if AUTH_AVAILABLE and any(s.get("user_id") == "" for s in items):
-        orphan_ids = [s["session_id"] for s in items if s.get("user_id") == ""]
-        await db_collection.update_many(
-            {"session_id": {"$in": orphan_ids}, "user_id": ""},
-            {"$set": {"user_id": user["sub"]}},
-        )
-        for s in items:
-            if s.get("user_id") == "":
-                s["user_id"] = user["sub"]
     return JSONResponse({"page": page, "limit": limit, "total": total, "sessions": items})
 
 

@@ -98,6 +98,7 @@ export function MeetingsPageClient() {
   const [error, setError] = useState("");
   const [transcribing, setTranscribing] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   /* ── Fetch integration status ── */
   const fetchStatus = useCallback(async () => {
@@ -116,14 +117,23 @@ export function MeetingsPageClient() {
 
   /* ── Fetch all meetings ── */
   const fetchMeetings = useCallback(async () => {
+    setRefreshing(true);
     try {
       const res = await fetch("/api/proxy/meetings/all");
       const data = await readJson(res);
       if (data.meetings) {
-        setMeetings(data.meetings);
+        // Filter out past events — only show upcoming
+        const now = new Date();
+        const upcoming = (data.meetings as Meeting[]).filter((m) => {
+          const end = m.end_time ? new Date(m.end_time) : m.start_time ? new Date(m.start_time) : null;
+          return end ? end >= now : true;
+        });
+        setMeetings(upcoming);
       }
     } catch {
       // Non-critical — status already shown
+    } finally {
+      setRefreshing(false);
     }
   }, []);
 
@@ -392,11 +402,12 @@ export function MeetingsPageClient() {
           </h2>
           <button
             onClick={() => { fetchMeetings(); }}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all hover:bg-white/5"
+            disabled={refreshing}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all hover:bg-white/5 disabled:opacity-50"
             style={{ color: "rgba(255,255,255,0.5)" }}
           >
-            <RefreshCcw className="h-3 w-3" />
-            Refresh
+            <RefreshCcw className={`h-3 w-3 transition-transform ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Refreshing..." : "Refresh"}
           </button>
         </div>
 
@@ -488,45 +499,6 @@ export function MeetingsPageClient() {
         )}
       </div>
 
-      {/* Setup Guide */}
-      <div
-        className="rounded-2xl p-6"
-        style={{ background: "rgba(124,58,237,0.05)", border: "1px solid rgba(124,58,237,0.15)" }}
-      >
-        <h3 className="text-sm font-semibold text-white mb-3">Setup Guide</h3>
-        <div className="space-y-4 text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>
-          <div>
-            <div className="font-semibold text-violet-300 mb-1">Zoom</div>
-            <ol className="list-decimal ml-4 space-y-1">
-              <li>Go to <span className="text-violet-300">marketplace.zoom.us</span> &rarr; Develop &rarr; Build App</li>
-              <li>Choose <strong>OAuth</strong> app type</li>
-              <li>Set redirect URL to: <code className="text-violet-300">http://localhost:3000/meetings?provider=zoom</code></li>
-              <li>Copy Client ID &amp; Secret to your <code>.env</code> file</li>
-              <li>Add scopes: <code>meeting:read:list_meetings</code>, <code>recording:read:list_recording_files</code></li>
-            </ol>
-          </div>
-          <div>
-            <div className="font-semibold text-blue-300 mb-1">Google Calendar</div>
-            <ol className="list-decimal ml-4 space-y-1">
-              <li>Go to <span className="text-blue-300">console.cloud.google.com</span></li>
-              <li>Create a project &rarr; Enable <strong>Google Calendar API</strong></li>
-              <li>Go to Credentials &rarr; Create OAuth Client ID (Web application)</li>
-              <li>Set redirect URI to: <code className="text-blue-300">http://localhost:3000/meetings?provider=google</code></li>
-              <li>Copy Client ID &amp; Secret to your <code>.env</code> file</li>
-            </ol>
-          </div>
-          <div>
-            <div className="font-semibold text-green-300 mb-1">Webex</div>
-            <ol className="list-decimal ml-4 space-y-1">
-              <li>Go to <span className="text-green-300">developer.webex.com</span> &rarr; My Apps</li>
-              <li>Create a New App &rarr; Integration</li>
-              <li>Set redirect URI to: <code className="text-green-300">http://localhost:3000/meetings?provider=webex</code></li>
-              <li>Select scopes: <code>meeting:schedules_read</code>, <code>meeting:recordings_read</code>, <code>meeting:transcripts_read</code></li>
-              <li>Copy Client ID &amp; Secret to your <code>.env</code> file</li>
-            </ol>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

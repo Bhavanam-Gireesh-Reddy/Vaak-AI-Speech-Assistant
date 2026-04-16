@@ -215,8 +215,22 @@ async def _generate_json(prompt: str, system: str, fallback: Any) -> Any:
         return fallback
 
 
+def _has_enough_content(session_doc: dict[str, Any], min_chars: int = 100) -> bool:
+    """Check if session has enough transcript content for AI generation."""
+    text = (
+        session_doc.get("corrected_transcript")
+        or session_doc.get("filtered_transcript")
+        or session_doc.get("transcript")
+        or ""
+    )
+    return len(text.strip()) >= min_chars
+
+
 async def generate_flashcards(session_doc: dict[str, Any]) -> list[dict[str, str]]:
     fallback = []
+    if not _has_enough_content(session_doc):
+        print("  [AI] Skipping flashcards — transcript too short")
+        return fallback
     system = (
         "You create concise, high-quality study flashcards from transcripts. "
         "Return valid JSON only: an array of 8 to 12 objects with keys "
@@ -232,6 +246,9 @@ async def generate_flashcards(session_doc: dict[str, Any]) -> list[dict[str, str
 
 async def generate_quiz(session_doc: dict[str, Any]) -> dict[str, Any]:
     fallback = {"title": session_doc.get("title", "Quiz"), "questions": []}
+    if not _has_enough_content(session_doc):
+        print("  [AI] Skipping quiz — transcript too short")
+        return fallback
     system = (
         "You create transcript-based multiple-choice quizzes. "
         "Return valid JSON only with keys title and questions. "

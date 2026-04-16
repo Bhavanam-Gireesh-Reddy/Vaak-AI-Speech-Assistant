@@ -8,7 +8,8 @@ import {
   Square,
   Upload,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@/components/providers/auth-provider";
 
 /* ── Style tokens ───────────────────────────────────────────────── */
 const CARD: React.CSSProperties = {
@@ -74,7 +75,7 @@ type WsMessage =
   | { type: "sentiment"; sentiment?: SentimentItem }
   | { type: "error"; message: string };
 
-const STORAGE_KEY = "sarvam_session";
+const STORAGE_KEY_PREFIX = "sarvam_session";
 
 const SPEAKER_COLORS = [
   { bg: "rgba(0,212,255,0.12)", border: "rgba(0,212,255,0.35)", text: "#00d4ff" },
@@ -102,6 +103,9 @@ function msToSRT(ms: number) {
 
 /* ── Component ─────────────────────────────────────────────────── */
 export function LivePage() {
+  const { user } = useAuth();
+  const storageKey = useMemo(() => user?.email ? `${STORAGE_KEY_PREFIX}_${user.email}` : STORAGE_KEY_PREFIX, [user?.email]);
+
   /* ── Settings ── */
   const [mode, setMode] = useState("translate");
   const [srcLang, setSrcLang] = useState("hi-IN");
@@ -247,9 +251,9 @@ export function LivePage() {
         correctedTranscript: correctedTranscriptRef.current,
         savedAt: Date.now(),
       };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      localStorage.setItem(storageKey, JSON.stringify(payload));
     } catch { /* ignore */ }
-  }, []);
+  }, [storageKey]);
 
   /* ── Generate translated output ── */
   const generateTranslation = useCallback(async (sessionId: string, tLang: string) => {
@@ -539,7 +543,7 @@ registerProcessor('pcm-processor', PCMProcessor);
   useEffect(() => {
     stopWaveform();
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(storageKey);
       if (!raw) return;
       const payload = JSON.parse(raw) as {
         transcriptLog?: TranscriptEntry[];
@@ -560,7 +564,7 @@ registerProcessor('pcm-processor', PCMProcessor);
       showToast(`✓ Session restored (${ageStr})`, "ok");
     } catch { /* ignore */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [storageKey]);
 
   /* ── Scroll listener ── */
   useEffect(() => {
@@ -619,7 +623,7 @@ registerProcessor('pcm-processor', PCMProcessor);
 
   function clearTranscript() {
     if (!confirm("Clear the current transcript? This cannot be undone.")) return;
-    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+    try { localStorage.removeItem(storageKey); } catch { /* ignore */ }
     filteredTranscriptRef.current = null; correctedTranscriptRef.current = null;
     setEntries([]); setPartial(""); setSegCount(0); setWordCount(0); setDuration("0s");
     setLiveSummary(null); setAiSummary(null); setSpeakers([]); setProcessing(null);
