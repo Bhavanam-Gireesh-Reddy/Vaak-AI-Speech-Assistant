@@ -66,6 +66,8 @@ async def call_groq(prompt: str, system: str, max_tokens: int = 2000) -> str:
             res.raise_for_status()
             data    = res.json()
             content = data["choices"][0]["message"]["content"].strip()
+            # Gemma 4 wraps responses in <thought>...</thought> — strip it
+            content = re.sub(r"<thought>.*?</thought>\s*", "", content, flags=re.DOTALL).strip()
             print(f"  [LLM] ✅ {GEMINI_MODEL} responded ({len(content)} chars)")
             return content
 
