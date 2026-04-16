@@ -104,7 +104,7 @@ except ImportError as e:
 
 SARVAM_API_KEY     = os.getenv("SARVAM_API_KEY",     "YOUR_SARVAM_API_KEY_HERE")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "YOUR_GROQ_API_KEY_HERE")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 USE_REDIS      = os.getenv("USE_REDIS",      "false").lower() == "true"
 REDIS_URI      = os.getenv("REDIS_URI",      "redis://localhost:6379")
 MONGO_URI      = os.getenv("MONGO_URI",      "mongodb://localhost:27017")
@@ -187,9 +187,9 @@ async def lifespan(app: FastAPI):
     global db_client, db_collection, users_col, redis_client
     if LLM_AVAILABLE:
         llm_module.GROQ_API_KEY = GROQ_API_KEY
-        or_ok = OPENROUTER_API_KEY not in ("", "YOUR_OPENROUTER_API_KEY_HERE")
+        gem_ok = GEMINI_API_KEY not in ("", "YOUR_GEMINI_API_KEY_HERE")
         groq_ok = GROQ_API_KEY != "YOUR_GROQ_API_KEY_HERE"
-        print(f"{'✅' if or_ok else '⚠️ '} OpenRouter/Gemma 4 {'ready' if or_ok else 'OPENROUTER_API_KEY not set'}")
+        print(f"{'✅' if gem_ok else '⚠️ '} Gemini API / Gemma 4 {'ready' if gem_ok else 'GEMINI_API_KEY not set'}")
         print(f"{'✅' if groq_ok else '⚠️ '} Groq Vision {'ready' if groq_ok else 'GROQ_API_KEY not set (vision/OCR disabled)'}")
     if MONGO_AVAILABLE:
         try:
@@ -1921,11 +1921,11 @@ async def translate_ws(client_ws: WebSocket):
             except Exception:
                 pass
 
-            if LLM_AVAILABLE and os.getenv("OPENROUTER_API_KEY", "") not in ("", "YOUR_OPENROUTER_API_KEY_HERE"):
-                print(f"  [LLM] Calling Gemma 4 via OpenRouter...")
+            if LLM_AVAILABLE and os.getenv("GEMINI_API_KEY", "") not in ("", "YOUR_GEMINI_API_KEY_HERE"):
+                print(f"  [LLM] Calling Gemma 4 via Gemini API...")
                 result = await process_session(all_sentences)
             else:
-                print(f"  [LLM] Skipped — LLM_AVAILABLE={LLM_AVAILABLE}, OPENROUTER_API_KEY set={bool(os.getenv('OPENROUTER_API_KEY', ''))}")
+                print(f"  [LLM] Skipped — LLM_AVAILABLE={LLM_AVAILABLE}, GEMINI_API_KEY set={bool(os.getenv('GEMINI_API_KEY', ''))}")
 
             # 2. Send analysis results to browser while connection is open
             try:

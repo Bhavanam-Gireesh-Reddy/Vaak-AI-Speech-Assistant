@@ -1,6 +1,6 @@
 """
-LLM helper — OpenRouter (Gemma 4) for text, Groq for vision
-- Text model : google/gemma-4-31b-it:free via OpenRouter
+LLM helper — Gemini API (Gemma 4) for text, Groq for vision
+- Text model : gemma-4-31b-it via Google Gemini API
 - Vision model: meta-llama/llama-4-scout-17b-16e-instruct via Groq
 """
 
@@ -16,12 +16,12 @@ try:
 except ImportError:
     pass
 
-# ── OpenRouter (text LLM) ────────────────────────────────────────────────────
-OPENROUTER_URL   = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemma-4-31b-it:free")
+# ── Gemini API (text LLM) ────────────────────────────────────────────────────
+GEMINI_URL   = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemma-4-31b-it")
 
-def _openrouter_key() -> str:
-    return os.getenv("OPENROUTER_API_KEY", "")
+def _gemini_key() -> str:
+    return os.getenv("GEMINI_API_KEY", "")
 
 # ── Groq (vision only) ───────────────────────────────────────────────────────
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -31,14 +31,14 @@ def _groq_key() -> str:
 
 # Backward compat — kept so main.py doesn't break if it sets these
 GROQ_API_KEY = ""
-GROQ_MODEL = OPENROUTER_MODEL  # alias for any code that reads this
+GROQ_MODEL = GEMINI_MODEL  # alias for any code that reads this
 
 
 async def call_groq(prompt: str, system: str, max_tokens: int = 2000) -> str:
-    """Call OpenRouter API (Gemma 4). Reads API key from env at call time."""
-    api_key = _openrouter_key()
+    """Call Gemini API (Gemma 4). Reads API key from env at call time."""
+    api_key = _gemini_key()
     if not api_key:
-        print("  [LLM] ❌ OPENROUTER_API_KEY not set — check your .env file")
+        print("  [LLM] ❌ GEMINI_API_KEY not set — check your .env file")
         return ""
 
     headers = {
@@ -46,7 +46,7 @@ async def call_groq(prompt: str, system: str, max_tokens: int = 2000) -> str:
         "Content-Type":  "application/json",
     }
     payload = {
-        "model":      OPENROUTER_MODEL,
+        "model":      GEMINI_MODEL,
         "max_tokens": max_tokens,
         "messages": [
             {"role": "system", "content": system},
@@ -55,18 +55,18 @@ async def call_groq(prompt: str, system: str, max_tokens: int = 2000) -> str:
     }
 
     try:
-        print(f"  [LLM] 🔷 Calling {OPENROUTER_MODEL} via OpenRouter...")
+        print(f"  [LLM] 🔷 Calling {GEMINI_MODEL} via Gemini API...")
         async with httpx.AsyncClient(timeout=60) as client:
-            res = await client.post(OPENROUTER_URL, headers=headers, json=payload)
+            res = await client.post(GEMINI_URL, headers=headers, json=payload)
 
             if res.status_code == 429:
-                print(f"  [LLM] ⚠️  429 rate limit on {OPENROUTER_MODEL} — try again in a moment")
+                print(f"  [LLM] ⚠️  429 rate limit on {GEMINI_MODEL} — try again in a moment")
                 return ""
 
             res.raise_for_status()
             data    = res.json()
             content = data["choices"][0]["message"]["content"].strip()
-            print(f"  [LLM] ✅ {OPENROUTER_MODEL} responded ({len(content)} chars)")
+            print(f"  [LLM] ✅ {GEMINI_MODEL} responded ({len(content)} chars)")
             return content
 
     except httpx.HTTPStatusError as e:
@@ -190,7 +190,7 @@ async def process_session(sentences: list) -> dict:
         return empty
 
     text = " ".join(sentences)
-    print(f"  [LLM] Processing {len(sentences)} sentences ({len(text)} chars) with {OPENROUTER_MODEL}...")
+    print(f"  [LLM] Processing {len(sentences)} sentences ({len(text)} chars) with {GEMINI_MODEL}...")
 
     result = await call_groq(
         f"Analyze this transcript:\n\n{text}",
@@ -224,7 +224,7 @@ async def process_session(sentences: list) -> dict:
         speakers  = data.get("speakers",  [])
         notes     = data.get("notes",     "")
 
-        print(f"  [LLM] ✅ {OPENROUTER_MODEL} → Title:'{title}' Speakers:{len(speakers)} Notes:{len(notes)} chars Summary:{len(summary)} chars")
+        print(f"  [LLM] ✅ {GEMINI_MODEL} → Title:'{title}' Speakers:{len(speakers)} Notes:{len(notes)} chars Summary:{len(summary)} chars")
         return {
             "summary":              summary,
             "filtered_transcript":  filtered,
