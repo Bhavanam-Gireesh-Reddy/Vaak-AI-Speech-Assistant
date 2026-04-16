@@ -1,366 +1,349 @@
-# 🎙️ Sarvam AI Live Transcription & Translation — Saaras V3
+# MeetWise AI Meeting Assistant
 
-Enterprise-grade real-time speech transcription, translation, and intelligent session analysis powered by **Sarvam AI**, **Groq LLM**, and **MongoDB**.
+Real-time speech transcription, translation, and AI-powered study tools built with **Sarvam AI**, **Google Gemini**, and **Next.js**.
 
-**Features:**
-- ✅ **Sub-150ms latency** — live WebSocket streaming via Saaras V3
-- ✅ **11 Indian languages** — translate to English, transcribe, code-mix, or verbatim modes
-- ✅ **Smart session analysis** — automatic keyword extraction, transcript filtering, and title generation via Groq AI
-- ✅ **AI Study Notes & Exports** — auto-generates structured notes and allows one-click export to PDF, DOC, and TXT.
-- ✅ **AI Studio** — generate interactive flashcards & quizzes (with animated carousel UI), podcast scripts, mind maps, multi-language outputs, and grounded transcript chat.
-- ✅ **Rich Markdown Notes** — auto-extracts comprehensive and detailed study notes complete with Markdown tables, LaTeX equations, and Mermaid diagrams based strictly on technical content.
-- ✅ **Speaker identification** — inferred multi-speaker turns shown in live analysis and saved sessions
-- ✅ **Real-time sentiment analysis** — live tone tracking across captured transcript segments
-- ✅ **Custom vocabulary support** — bias and normalize terminology with per-session word mappings
-- ✅ **Distributed Scalability** — built-in Redis Pub/Sub for syncing WebSockets across multiple server workers.
-- ✅ **User authentication** — JWT-based auth + API key management
-- ✅ **Session persistence** — store transcripts, translations, and metadata in MongoDB
-- ✅ **Voice Activity Detection (VAD)** — auto-detects speech start/end
-- ✅ **Live waveform visualization** — real-time volume meter + animated spectrum
-- ✅ **Word & segment counters** — track speaking metrics
-- ✅ **Secure API key management** — environment-based configuration
+Live-transcribe lectures in 11 Indian languages, then auto-generate notes, flashcards, quizzes, mind maps, and podcast scripts from the transcript.
 
 ---
 
-## 📋 Table of Contents
-- [Quick Start](#quick-start)
-- [Project Structure](#project-structure)
-- [Configuration](#configuration)
-- [API Endpoints](#api-endpoints)
-- [Architecture](#architecture)
-- [Development](#development)
-- [Security](#security)
+## Features
+
+### Live Transcription
+- Real-time speech-to-text via Sarvam AI Saaras V3 over WebSocket
+- 11 Indian languages: Hindi, Tamil, Telugu, Kannada, Malayalam, Bengali, Marathi, Gujarati, Punjabi, Odia, English
+- 4 modes: **translate** (to English), **transcribe** (original), **code-mix** (Hindi-English), **verbatim** (with fillers)
+- Live waveform visualization and volume meter
+- Voice Activity Detection (VAD) with auto-silence handling
+- Real-time sentiment analysis per sentence
+- Custom vocabulary support for domain-specific terms
+- Speaker identification from context
+
+### AI Studio
+- **Rich Notes** -- markdown with tables, LaTeX equations, and Mermaid diagrams
+- **Flashcards** -- auto-generated Q&A cards with explanations and difficulty levels
+- **Quizzes** -- multiple-choice questions grounded in transcript content
+- **Podcast Scripts** -- turn a lecture into a two-speaker educational dialogue
+- **Mind Maps** -- visual Mermaid-based knowledge maps
+- **Chat with Transcript** -- ask questions about session content
+- **Action Items** -- extract tasks, owners, deadlines, and priorities
+- **OCR Upload** -- scan handwritten notes via Groq Vision or Tesseract
+
+### Session Management
+- Auto-save transcripts to MongoDB with AI-generated titles and summaries
+- Full-text search across all sessions
+- Folder organization with auto-suggestions
+- Export to PDF, DOC, and TXT
+- Shareable public links (token-based, no login required)
+- Multi-language translation output
+
+### Meeting Integrations
+- **Zoom** -- OAuth connect, list meetings, transcribe recordings
+- **Google Calendar** -- view upcoming events, transcribe Google Meet recordings
+- **Webex** -- OAuth connect, list meetings, transcribe recordings
+- Webhook support for automatic transcription on recording completion
+
+### User System
+- JWT authentication with 72-hour token expiry
+- Bcrypt password hashing
+- API key generation for programmatic access
+- Admin panel for user management
+- Per-user session isolation
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 14, React 18, TailwindCSS, Lucide icons |
+| Backend | FastAPI, Uvicorn, WebSocket streaming |
+| Speech-to-Text | Sarvam AI Saaras V3 |
+| Text LLM | Google Gemini API (gemini-2.5-flash) |
+| Vision/OCR | Groq (Llama 4 Scout) |
+| Database | MongoDB (via Motor async driver) |
+| Cache/Pub-Sub | Redis (optional, for multi-worker scaling) |
+| Auth | JWT (python-jose) + Bcrypt |
 
 ---
 
 ## Quick Start
 
-### 1. Clone & Install Dependencies
+### Prerequisites
+- Python 3.10+
+- Node.js 18+
+- MongoDB (local or Atlas)
+- Redis (optional)
+
+### 1. Clone and install
+
 ```bash
-cd Sarvam
+git clone https://github.com/Bhavanam-Gireesh-Reddy/MeetWise-AI-Meeting-Assistant.git
+cd MeetWise-AI-Meeting-Assistant
+
+# Backend
 pip install -r requirements.txt
+
+# Frontend
+cd frontend
+npm install
+cd ..
 ```
 
-### 2. Configure Environment Variables
+### 2. Configure environment
 
-Create a `.env` file in the project root with your API keys and database settings:
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your API keys:
 
 ```env
-# Sarvam AI
-SARVAM_API_KEY=your_sarvam_api_key_here
+# Required
+SARVAM_API_KEY=your_key          # https://dashboard.sarvam.ai
+GEMINI_API_KEY=your_key          # https://aistudio.google.com/apikey
+SECRET_KEY=random_32_char_string
 
-# Groq LLM (for session analysis)
-GROQ_API_KEY=your_groq_api_key_here
-
-# MongoDB
+# Database
 MONGO_URI=mongodb://localhost:27017
 MONGO_DB=live_transcription
 MONGO_COL=sessions
 MONGO_COL_USERS=users
 
-# Security (change this in production!)
-SECRET_KEY=your_secret_key_here_min_32_chars
+# Optional
+GROQ_API_KEY=your_key            # For Vision/OCR (https://console.groq.com)
+GEMINI_MODEL=gemini-2.5-flash    # Default model
+USE_REDIS=false
+REDIS_URI=redis://localhost:6379
 ```
 
-> ⚠️ **NEVER commit `.env` to version control** — it's in `.gitignore` for your protection.
+Also configure the frontend:
 
-### 3. Start Database & Cache
-You need MongoDB and Redis running for the application to work correctly:
-- Install and run [MongoDB](https://www.mongodb.com/try/download/community) locally on port `27017`
-- Install and run [Redis](https://redis.io/download/) locally on port `6379`
-
-*(Alternatively, you can use cloud instances by updating your `.env` connection URIs).*
-
-### 4. Run the Server
 ```bash
-python main.py
+cp frontend/.env.example frontend/.env
 ```
 
-Server starts on `http://localhost:8000`
+```env
+BACKEND_URL=http://127.0.0.1:8000
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+```
 
-### 5. Access the Application
-- **Web UI:** http://localhost:8000
-- **API Docs:** http://localhost:8000/api/docs
-- **Alternative Docs:** http://localhost:8000/api/redoc
+### 3. Start the application
+
+```bash
+# Terminal 1: Backend
+python main.py
+# Starts on http://localhost:8000
+
+# Terminal 2: Frontend
+cd frontend
+npm run dev
+# Starts on http://localhost:3000
+```
+
+### 4. First-time setup
+
+1. Open http://localhost:3000
+2. Register an account
+3. The first user is auto-promoted to admin
+4. Start transcribing from the **Live** page
 
 ---
 
 ## Project Structure
 
 ```
-Sarvam/
-├── .env                 # ⚠️ API keys & secrets (NOT in git)
-├── .gitignore          # Excludes .env and Python cache
+MeetWise-AI-Meeting-Assistant/
+├── main.py                 # FastAPI app, all API routes, WebSocket handler
+├── llm.py                  # Gemini API (text) + Groq (vision) integration
+├── ai_features.py          # AI tools: flashcards, quizzes, notes, OCR, sentiment
+├── auth.py                 # JWT + Bcrypt authentication
+├── meetings.py             # Zoom, Google, Webex OAuth and API wrappers
+├── requirements.txt        # Python dependencies
+├── .env.example            # Environment variable template
 │
-├── main.py             # FastAPI app, WebSocket streaming, auth routes
-├── llm.py              # Groq LLM integration for session analysis
-├── auth.py             # JWT, bcrypt, API key generation & validation
+├── frontend/
+│   ├── package.json
+│   ├── .env.example
+│   └── src/
+│       ├── app/
+│       │   ├── (app)/              # Protected routes
+│       │   │   ├── live/           # Live transcription
+│       │   │   ├── studio/         # AI study tools
+│       │   │   ├── dashboard/      # Analytics overview
+│       │   │   ├── history/        # Session browser
+│       │   │   ├── meetings/       # Meeting integrations
+│       │   │   └── admin/          # User management
+│       │   ├── (auth)/             # Public routes
+│       │   │   ├── login/
+│       │   │   └── register/
+│       │   ├── share/[token]/      # Public shared transcripts
+│       │   └── embed/live/         # Embeddable widget
+│       ├── components/
+│       │   ├── live/               # WebSocket audio + waveform
+│       │   ├── studio/             # Flashcards, quizzes, mind maps
+│       │   ├── dashboard/          # Stats and charts
+│       │   ├── history/            # Search and filter
+│       │   ├── meetings/           # Platform connectors
+│       │   ├── admin/              # Admin panel
+│       │   ├── auth/               # Login/register forms
+│       │   └── providers/          # Auth context
+│       └── lib/
+│           ├── auth-types.ts       # Type definitions
+│           └── server-auth.ts      # Server-side auth helpers
 │
-├── templates/
-│   ├── index.html      # Main live transcription UI
-│   ├── dashboard.html  # Session history & analytics
-│   ├── login.html      # User login page
-│   ├── register.html   # User registration page
-│   └── history.html    # Transcript history
-│
-├── requirements.txt    # Python dependencies
-├── README.md          # This file
-└── __pycache__/       # Python bytecode (auto-generated)
+├── SECURITY.md
+├── MEETING_SETUP_GUIDE.md
+└── README.md
 ```
-
----
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SARVAM_API_KEY` | *(required)* | Sarvam AI API key for speech transcription |
-| `GROQ_API_KEY` | *(required)* | Groq API key for LLM-based session analysis |
-| `MONGO_URI` | `mongodb://localhost:27017` | MongoDB connection string |
-| `MONGO_DB` | `live_transcription` | MongoDB database name |
-| `MONGO_COL` | `sessions` | MongoDB collection for transcription sessions |
-| `MONGO_COL_USERS` | `users` | MongoDB collection for user accounts |
-| `REDIS_URI` | `redis://localhost:6379` | Redis connection for WebSocket Pub/Sub scaling |
-| `SECRET_KEY` | *(required)* | JWT signing key (min 32 chars, change in production) |
-
-### Optional: OCR Setup (for Handwritten Notes)
-
-The OCR feature supports **two methods** for extracting text from handwritten notes and images:
-
-#### Option 1: Tesseract OCR (System-installed, high accuracy)
-Install system-wide for best performance:
-
-**Windows:**
-```bash
-# Download installer from: https://github.com/UB-Mannheim/tesseract/wiki
-# Or use Chocolatey:
-choco install tesseract
-```
-
-**macOS:**
-```bash
-brew install tesseract
-```
-
-**Linux (Ubuntu/Debian):**
-```bash
-sudo apt-get install tesseract-ocr
-```
-
-#### Option 2: EasyOCR (pip-installable, recommended for cloud)
-Pre-installed in `requirements.txt`. Downloads model (~100MB) on first use:
-```bash
-pip install easyocr
-```
-
-**Note:** If neither is available, the app provides helpful error messages with setup instructions directly in the UI.
-
-### Get API Keys
-
-1. **Sarvam AI** → https://sarvam.ai (sign up for API access)
-2. **Groq** → https://console.groq.com (free tier available, 14,400 reqs/day)
 
 ---
 
 ## API Endpoints
 
-### Public Routes
-- `GET /` — Main transcription UI
-- `GET /login` — User login page
-- `GET /register` — User registration page
-- `POST /api/register` — Register new user
-- `POST /api/login` — Login (returns JWT)
+### Authentication
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/auth/register` | Register new user |
+| POST | `/api/auth/login` | Login, returns JWT |
+| POST | `/api/auth/logout` | Logout |
+| GET | `/api/auth/me` | Get current user profile |
 
-### WebSocket (Live Transcription)
-- `WS /ws/translate` — Stream audio, receive transcriptions
+### Sessions
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/sessions` | List user's sessions |
+| GET | `/api/sessions/{id}` | Get session details |
+| DELETE | `/api/sessions` | Delete sessions |
+| GET | `/api/search` | Full-text search |
+| POST | `/api/sessions/{id}/translate` | Translate transcript |
 
-### Protected Routes (Requires JWT or API Key)
-- `GET /dashboard` — User session dashboard
-- `GET /api/sessions` — List user's past sessions
-- `GET /api/sessions/{session_id}` — Get session details
-- `POST /api/logout` — Logout
+### AI Features
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/sessions/{id}/flashcards` | Generate flashcards |
+| POST | `/api/sessions/{id}/quiz` | Generate quiz |
+| POST | `/api/sessions/{id}/podcast` | Generate podcast script |
+| POST | `/api/sessions/{id}/mindmap` | Generate mind map |
+| POST | `/api/sessions/{id}/rich_notes` | Generate rich markdown notes |
+| POST | `/api/sessions/{id}/chat` | Chat with transcript |
+| POST | `/api/sessions/{id}/action-items` | Extract action items |
+| POST | `/api/sessions/{id}/upload-notes` | OCR handwritten notes |
+
+### Meetings
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/meetings/status` | Integration status |
+| GET | `/api/meetings/all` | All upcoming meetings |
+| GET | `/api/meetings/{platform}/auth` | OAuth authorization URL |
+| POST | `/api/meetings/{platform}/callback` | OAuth callback |
+| POST | `/api/meetings/disconnect` | Disconnect platform |
+
+### WebSocket
+| Path | Description |
+|------|-------------|
+| `WS /ws/translate` | Live audio streaming and transcription |
+
+### Admin
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/admin/users` | List all users |
+| DELETE | `/api/admin/users/{id}` | Delete user |
+| POST | `/api/admin/users/{id}/promote` | Promote to admin |
+| GET | `/api/admin/stats` | System statistics |
+
+### API v1 (for programmatic access with API keys)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/sessions` | List sessions |
+| GET | `/api/v1/sessions/{id}` | Get session |
+| GET | `/api/v1/sessions/{id}/transcript` | Get transcript only |
+| DELETE | `/api/v1/sessions/{id}` | Delete session |
+| GET | `/api/v1/search` | Search sessions |
+| GET | `/api/v1/me` | Get user profile |
 
 ---
 
 ## Architecture
 
-### Data Flow
-
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ Browser (Web Audio API)                                     │
-│ • Captures microphone at 16 kHz (PCM mono)                  │
-│ • Sends ~256ms chunks every 50ms (low latency)             │
-└──────────────────┬──────────────────────────────────────────┘
-                   │ WebSocket /ws/translate (Base64 chunks)
-                   ▼
-┌──────────────────────────────────────────────────────────────┐
-│ FastAPI Server (main.py)                                     │
-│ • Receives audio chunks                                      │
-│ • Forwards to Sarvam AI Saaras V3                           │
-│ • Returns transcript/partial results in real-time          │
-└──────────────────┬──────────────────────────────────────────┘
-                   │
-        ┌──────────┴──────────┐
-        ▼                     ▼
-┌──────────────────┐  ┌─────────────────────────────┐
-│ Sarvam AI        │  │ MongoDB (session storage)   │
-│ (Transcription)  │  │ • Sessions & transcripts    │
-└──────────────────┘  │ • Users & API keys          │
-        ▲             │ • Metadata                  │
-        │             └─────────────────────────────┘
-        │                     ▲
-        └─────────────────────┘
-              (when session ends)
-                      │
-        ┌─────────────┴──────────────┐
-        ▼                            ▼
-┌──────────────────┐  ┌──────────────────────────────┐
-│ Browser (UI)     │  │ Groq LLM (llm.py)            │
-│ • Live updates  │  │ • Extract keywords           │
-│ • Waveform viz  │  │ • Generate Study Notes       │
-│ • Session recap │  │ • Generate Title & Summary   │
-└──────────────────┘  │ • Fix punctuation & caps     │
-                      └──────────────────────────────┘
+Browser (Next.js)
+    │
+    ├── Web Audio API ──► WebSocket /ws/translate ──► FastAPI Server
+    │                         │                          │
+    │                         ▼                          ▼
+    │                    Sarvam AI               MongoDB (sessions)
+    │                    Saaras V3               MongoDB (users)
+    │                  (transcription)
+    │
+    ├── REST API calls ──► FastAPI ──► Gemini API (notes, flashcards, quizzes)
+    │                                ──► Groq Vision (OCR)
+    │                                ──► Zoom/Google/Webex (meetings)
+    │
+    └── Auth ──► JWT tokens ──► FastAPI middleware
 ```
 
-### Key Components
+### Data Flow (Live Transcription)
 
-1. **FastAPI Server** (`main.py`)
-   - WebSocket endpoint for live audio streaming
-   - JWT-based user authentication
-   - Session management & MongoDB integration
-
-2. **LLM Module** (`llm.py`)
-   - Groq API integration for intelligent transcript analysis
-   - Keyword extraction, filtering, and title generation
-   - Runs automatically when session ends
-
-3. **Auth Module** (`auth.py`)
-   - Bcrypt password hashing
-   - JWT token generation (72-hour expiry)
-   - API key management for programmatic access
-
-4. **Frontend** (`templates/`)
-   - Real-time transcription UI with live waveform
-   - User dashboard with session history
-   - Authentication pages (login/register)
+1. Browser captures microphone audio at 16 kHz mono PCM
+2. Audio chunks sent over WebSocket to FastAPI
+3. Server streams chunks to Sarvam AI Saaras V3
+4. Partial and final transcripts returned in real-time
+5. Custom vocabulary normalization applied
+6. Sentiment analyzed per sentence
+7. On session stop: Gemini generates title, summary, speakers, filtered transcript, notes
+8. Full session saved to MongoDB
 
 ---
 
-## Usage Guide
+## Environment Variables
 
-### 1. Register & Login
-- Navigate to `http://localhost:8000/register`
-- Create account (email + password)
-- Login to get JWT token
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SARVAM_API_KEY` | Yes | Sarvam AI API key for speech transcription |
+| `GEMINI_API_KEY` | Yes | Google Gemini API key for text LLM |
+| `SECRET_KEY` | Yes | JWT signing key (min 32 chars) |
+| `MONGO_URI` | Yes | MongoDB connection string |
+| `MONGO_DB` | No | Database name (default: `live_transcription`) |
+| `MONGO_COL` | No | Sessions collection (default: `sessions`) |
+| `MONGO_COL_USERS` | No | Users collection (default: `users`) |
+| `GEMINI_MODEL` | No | LLM model (default: `gemini-2.5-flash`) |
+| `GROQ_API_KEY` | No | Groq API key for Vision/OCR features |
+| `USE_REDIS` | No | Enable Redis Pub/Sub (default: `false`) |
+| `REDIS_URI` | No | Redis connection string |
+| `ZOOM_CLIENT_ID` | No | Zoom OAuth client ID |
+| `ZOOM_CLIENT_SECRET` | No | Zoom OAuth client secret |
+| `GOOGLE_CLIENT_ID` | No | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | No | Google OAuth client secret |
+| `WEBEX_CLIENT_ID` | No | Webex OAuth client ID |
+| `WEBEX_CLIENT_SECRET` | No | Webex OAuth client secret |
 
-### 2. Start Transcription
-- Go to main UI: `http://localhost:8000`
-- Select **Mode**:
-  - `translate` — English output (from any Indian language)
-  - `transcribe` — Original language output
-  - `codemix` — Hindi-English mixed speech
-  - `verbatim` — Exact words including filler sounds
+### Get API Keys
 
-- Select **Source Language**: Hindi, Tamil, Telugu, etc.
-- Click **▶ Start** (or press `Enter`)
-- Allow microphone access
-- Start speaking!
-
-### 3. Session Ends When
-- You click **⏹ Stop**
-- 30+ seconds of silence (VAD threshold)
-
-### 4. Post-Session
-- Transcript automatically enhanced with:
-  - Keywords extracted
-  - Technical content filtered
-  - Session title generated
-  - Punctuation & capitalization fixed
-- Data saved to MongoDB
-- View in **Dashboard**
+| Service | URL | Tier |
+|---------|-----|------|
+| Sarvam AI | https://dashboard.sarvam.ai | Paid |
+| Google Gemini | https://aistudio.google.com/apikey | Free (15 RPM, 1M tokens/day) |
+| Groq | https://console.groq.com/keys | Free (vision/OCR) |
 
 ---
 
-## Advanced: Using the API Programmatically
+## Supported Languages
 
-### Get API Key
-```bash
-# Login & get JWT
-curl -X POST http://localhost:8000/api/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"yourpass"}'
-```
+| Language | Code | Transcription | Translation |
+|----------|------|:---:|:---:|
+| Hindi | hi-IN | Yes | Yes |
+| Tamil | ta-IN | Yes | Yes |
+| Telugu | te-IN | Yes | Yes |
+| Kannada | kn-IN | Yes | Yes |
+| Malayalam | ml-IN | Yes | Yes |
+| Bengali | bn-IN | Yes | Yes |
+| Marathi | mr-IN | Yes | Yes |
+| Gujarati | gu-IN | Yes | Yes |
+| Punjabi | pa-IN | Yes | Yes |
+| Odia | or-IN | Yes | Yes |
+| English | en-IN | Yes | Yes |
 
-### Stream Audio via WebSocket
-```javascript
-// Connect to WebSocket
-const ws = new WebSocket('ws://localhost:8000/ws/translate?mode=translate&lang=hi&api_key=YOUR_API_KEY');
-
-// Send audio chunk (Base64 WAV)
-ws.send(base64AudioChunk);
-
-// Receive transcription
-ws.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  console.log('Partial:', data.partial);
-  console.log('Final:', data.final);
-};
-```
-
----
-
-## Development
-
-### Environment Setup
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### Run Application
-```bash
-# Run server
-python main.py
-```
-
-### Logs & Debugging
-- Server logs printed to console
-- Check MongoDB using `mongosh`:
-  ```bash
-  mongosh
-  > use live_transcription
-  > db.sessions.find().pretty()
-  ```
-
----
-
-## Security
-
-### Best Practices Implemented
-✅ **API keys in `.env`** — Never hardcoded in source  
-✅ **JWT tokens** — 72-hour expiry, cryptographically signed  
-✅ **Bcrypt hashing** — Passwords never stored in plaintext  
-✅ **`.gitignore`** — Prevents accidental commits of `.env`  
-✅ **CORS enabled** — Configured for trusted origins  
-
-### Production Deployment Checklist
-- [ ] Change `SECRET_KEY` to strong random string (32+ chars)
-- [ ] Use MongoDB Atlas (or secure MongoDB instance)
-- [ ] Enable HTTPS/SSL on FastAPI
-- [ ] Validate/refresh API keys in credential manager
-- [ ] Set `SARVAM_API_KEY` & `GROQ_API_KEY` via secure secrets (not `.env`)
-- [ ] Monitor API usage & rate limits
-- [ ] Implement rate limiting on WebSocket connections
-- [ ] Enable MongoDB authentication
-- [ ] Use environment-specific configs (dev/staging/prod)
+Additional translation outputs: French, Spanish, German, Japanese, Chinese, Arabic.
 
 ---
 
@@ -368,72 +351,64 @@ python main.py
 
 | Issue | Solution |
 |-------|----------|
-| `ModuleNotFoundError: No module named 'dotenv'` | Run `pip install python-dotenv` |
-| `404 Not Found` on `/` | Check `templates/` folder exists |
+| `GEMINI_API_KEY not set` | Add your Gemini key to `.env` |
 | `Connection refused - MongoDB` | Ensure `mongod` is running on localhost:27017 |
-| `API key not set` warning | Add `SARVAM_API_KEY` to `.env` |
-| `GROQ 429 rate limit` | Free tier has 14,400 requests/day; upgrade plan if needed |
-| Microphone not working | Check browser permissions, HTTPS required in production |
+| No summary/title after stop | Check server logs for `[LLM]` errors; restart server after `.env` changes |
+| Quiz/flashcards empty | Session needs at least ~100 characters of transcript |
+| Microphone not working | Allow mic permission in browser; HTTPS required in production |
+| 429 rate limit | Wait a moment; Gemini free tier allows 15 requests/minute |
+| OCR not working | Set `GROQ_API_KEY` or install Tesseract |
 
 ---
 
-## Performance Metrics
+## Security
 
-| Metric | Target | Actual |
-|--------|--------|--------|
-| Transcription latency | <150ms | Via WebSocket streaming |
-| Session startup | <1s | Depends on browser/mic permission |
-| Database insert | <100ms | MongoDB local |
-| LLM processing | <5s | Groq API response time |
-| UI responsiveness | 60 FPS | HTML5 Web Audio API |
+- API keys stored in `.env` (git-ignored)
+- JWT tokens with configurable expiry
+- Bcrypt password hashing
+- Per-user session isolation (localStorage and database)
+- CORS configured for trusted origins
+- Admin role-based access control
+- API key authentication for programmatic access
+
+### Production Checklist
+
+- [ ] Set a strong random `SECRET_KEY` (32+ chars)
+- [ ] Use MongoDB Atlas or authenticated MongoDB instance
+- [ ] Enable HTTPS/SSL
+- [ ] Set `CORS_ORIGINS` to your frontend domain
+- [ ] Use environment variables or a secrets manager (not `.env` files)
+- [ ] Enable Redis for multi-worker WebSocket scaling
+- [ ] Monitor API usage and rate limits
 
 ---
 
 ## Dependencies
 
-| Package | Purpose | Version |
-|---------|---------|---------|
-| `fastapi` | Web framework | ≥0.110.0 |
-| `uvicorn` | ASGI server | ≥0.29.0 |
-| `sarvamai` | Sarvam AI SDK | ≥0.1.11 |
-| `motor` | Async MongoDB | ≥3.3.0 |
-| `pymongo` | MongoDB driver | ≥4.6.0 |
-| `httpx` | Async HTTP client | ≥0.27.0 |
-| `bcrypt` | Password hashing | ≥4.0.0 |
-| `python-jose` | JWT support | ≥3.3.0 |
-| `python-dotenv` | `.env` loader | ≥1.0.0 |
+### Backend (Python)
+| Package | Purpose |
+|---------|---------|
+| fastapi | Web framework and WebSocket |
+| uvicorn | ASGI server |
+| sarvamai | Sarvam AI SDK |
+| motor | Async MongoDB driver |
+| httpx | Async HTTP client |
+| bcrypt | Password hashing |
+| python-jose | JWT tokens |
+| python-dotenv | Environment config |
+| redis | Pub/Sub scaling |
+| json-repair | LLM JSON output repair |
+| Pillow | Image processing |
+
+### Frontend (Node.js)
+| Package | Purpose |
+|---------|---------|
+| next | React framework (SSR) |
+| react | UI library |
+| tailwindcss | Utility CSS |
+| lucide-react | Icons |
+| typescript | Type safety |
 
 ---
 
-
-## Support & Contributing
-
-For issues, suggestions, or contributions:
-1. Check existing issues on GitHub
-2. Open a new issue with clear description
-3. Submit pull requests with tests
-
----
-
-## Roadmap
-
-- [ ] Multi-language output (not just English)
-- [x] Multi-language output (not just English)
-- [x] Voice profiles (speaker identification)
-- [ ] Conversation threading (multi-speaker support)
-- [x] Real-time sentiment analysis
-- [x] Custom vocabulary/terminology support
-- [x] Export to PDF/DOC/TXT
-- [x] Flashcards (Animated Carousel UI)
-- [x] Quizzes (Stacked interactive mode)
-- [x] AI Podcast generation
-- [x] Chat with your transcript
-- [x] Mind Maps (Mermaid format)
-- [x] Rich Notes (Tables & Equations)
-- [ ] Mobile app (React Native)
-- [ ] Docker containerization
-
----
-
-**Last Updated:** March 2026  
 **Status:** Active Development
