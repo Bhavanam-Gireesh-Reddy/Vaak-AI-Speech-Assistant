@@ -19,7 +19,7 @@ except ImportError:
     yt_dlp = None
     YTDLP_AVAILABLE = False
 
-from llm import call_groq, process_session, translate_transcript
+from llm import call_groq, call_groq_vision, process_session, translate_transcript
 
 
 LANGUAGE_CHOICES = {
@@ -522,85 +522,104 @@ async def extract_action_items(session_doc: dict[str, Any]) -> list[dict[str, An
 
 
 async def process_ocr_from_image(image_base64: str, file_type: str = "image/png") -> dict[str, Any]:
-    """Process OCR from uploaded image or handwritten notes with multiple fallback options."""
-    try:
-        import base64
-        import io
-        from PIL import Image
-    except ImportError:
-        print("  [OCR] ❌ Pillow not installed")
-        return {
-            "success": False,
-            "error": "Image processing library not available. Install Pillow: pip install Pillow",
-            "text": ""
-        }
+    """Process OCR from uploaded image or handwritten notes.
 
-    try:
-        # Decode base64
-        image_data = base64.b64decode(image_base64)
-        image = Image.open(io.BytesIO(image_data))
-        
-        # Try Tesseract first (system-installed)
+    Strategy (in order):
+    1. Groq Vision API  – best for handwritten text, uses existing API key
+    2. Tesseract         – fast, system-installed
+    3. EasyOCR           – Python-only fallback
+    """
+
+    # ── 1. Groq Vision (primary — best for handwritten notes) ────────────────
+    groq_key = os.getenv("GROQ_API_KEY", "")
+    if groq_key and groq_key != "YOUR_GROQ_API_KEY_HERE":
         try:
-            import pytesseract
-            text = pytesseract.image_to_string(image, lang='eng')
+            text = await call_groq_vision(image_base64, file_type)
             if text and text.strip():
-                cleaned_text = re.sub(r'\s+', ' ', text).strip()
+                # Preserve structure: collapse only runs of spaces (not newlines)
+                cleaned = re.sub(r"[^\S\n]+", " ", text).strip()
+                # Collapse 3+ blank lines into 2
+                cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
                 return {
                     "success": True,
-                    "text": cleaned_text,
+                    "text": cleaned,
                     "confidence": "high",
                     "file_type": file_type,
-                    "character_count": len(cleaned_text),
-                    "method": "tesseract"
+                    "character_count": len(cleaned),
+                    "method": "groq_vision",
                 }
-        except (ImportError, Exception) as tesseract_error:
-            print(f"  [OCR] ⚠️  Tesseract unavailable: {str(tesseract_error)[:100]}")
-        
-        # Try EasyOCR as fallback (lightweight)
+        except Exception as e:
+            print(f"  [OCR] ⚠️ Groq Vision failed, trying fallbacks: {e}")
+
+    # ── 2. Tesseract (system-installed) ──────────────────────────────────────
+    try:
+        import base64 as b64
+        import io
+        from PIL import Image
+
+        image_data = b64.b64decode(image_base64)
+        image = Image.open(io.BytesIO(image_data))
+
         try:
-            import easyocr
-            reader = easyocr.Reader(['en'], gpu=False)
-            # Convert PIL image to numpy array
-            import numpy as np
-            img_array = np.array(image)
-            result = reader.readtext(img_array, detail=0)  # detail=0 returns just text
-            text = ' '.join(result) if result else ""
-            
+            import pytesseract
+            text = pytesseract.image_to_string(image, lang="eng")
             if text and text.strip():
-                cleaned_text = re.sub(r'\s+', ' ', text).strip()
+                cleaned = re.sub(r"[^\S\n]+", " ", text).strip()
+                cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
                 return {
                     "success": True,
-                    "text": cleaned_text,
+                    "text": cleaned,
                     "confidence": "medium",
                     "file_type": file_type,
-                    "character_count": len(cleaned_text),
-                    "method": "easyocr"
+                    "character_count": len(cleaned),
+                    "method": "tesseract",
+                }
+        except (ImportError, Exception) as e:
+            print(f"  [OCR] ⚠️ Tesseract unavailable: {str(e)[:100]}")
+
+        # ── 3. EasyOCR (Python-only fallback) ────────────────────────────────
+        try:
+            import easyocr
+            import numpy as np
+
+            reader = easyocr.Reader(["en"], gpu=False)
+            img_array = np.array(image)
+            result = reader.readtext(img_array, detail=0)
+            text = "\n".join(result) if result else ""
+            if text and text.strip():
+                cleaned = re.sub(r"[^\S\n]+", " ", text).strip()
+                return {
+                    "success": True,
+                    "text": cleaned,
+                    "confidence": "medium",
+                    "file_type": file_type,
+                    "character_count": len(cleaned),
+                    "method": "easyocr",
                 }
         except ImportError:
-            print("  [OCR] ⚠️  EasyOCR not installed")
-        except Exception as easyocr_error:
-            print(f"  [OCR] ⚠️  EasyOCR error: {str(easyocr_error)[:100]}")
-        
-        # If both fail, return helpful message
-        return {
-            "success": False,
-            "error": "OCR not available. Install one of: 1) Tesseract (system) or 2) Run: pip install easyocr",
-            "text": "",
-            "setup_guide": {
-                "option1": "Install Tesseract: https://github.com/UB-Mannheim/tesseract/wiki",
-                "option2": "Install EasyOCR: pip install easyocr (recommended for cloud)",
-                "note": "EasyOCR will be downloaded on first use (~100MB)"
-            }
-        }
-        
+            print("  [OCR] ⚠️ EasyOCR not installed")
+        except Exception as e:
+            print(f"  [OCR] ⚠️ EasyOCR error: {str(e)[:100]}")
+
+    except ImportError:
+        print("  [OCR] ⚠️ Pillow not installed — skipping Tesseract/EasyOCR fallbacks")
     except Exception as e:
-        print(f"  [OCR] ❌ Error processing image: {e}")
-        return {
-            "success": False,
-            "error": f"Image processing failed: {str(e)}",
-            "text": ""
-        }
+        print(f"  [OCR] ❌ Image decode error: {e}")
+
+    # ── All methods failed ───────────────────────────────────────────────────
+    return {
+        "success": False,
+        "error": (
+            "OCR failed. Set GROQ_API_KEY in .env (recommended) "
+            "or install Tesseract/EasyOCR as fallback."
+        ),
+        "text": "",
+        "setup_guide": {
+            "recommended": "Set GROQ_API_KEY in your .env file (free at console.groq.com)",
+            "option1": "Install Tesseract: https://github.com/UB-Mannheim/tesseract/wiki",
+            "option2": "pip install easyocr (100MB download on first use)",
+        },
+    }
 
 
 
@@ -681,114 +700,189 @@ def _parse_vtt_to_text(vtt_text: str) -> str:
 
 def import_youtube_transcript(url: str, auth_browser: str = "", cookies_content: str = "") -> dict[str, Any]:
     if not YTDLP_AVAILABLE:
-        raise RuntimeError("yt-dlp is not installed. Add it from requirements and reinstall dependencies.")
+        raise RuntimeError(
+            "yt-dlp is not installed. Run: pip install yt-dlp"
+        )
     if not url.strip():
         raise ValueError("YouTube URL is required.")
 
     with tempfile.TemporaryDirectory(prefix="sarvam_yt_") as temp_dir:
         output_template = str(Path(temp_dir) / "%(id)s.%(ext)s")
-        ydl_opts = {
+
+        # Use multiple player clients for better bot-detection evasion
+        ydl_opts: dict[str, Any] = {
             "quiet": True,
+            "no_warnings": True,
             "skip_download": True,
             "writesubtitles": True,
             "writeautomaticsub": True,
-            "subtitleslangs": ["en", "en-US", "en-IN", "hi", "ta", "te", "kn", "ml", "bn", "mr", "gu", "pa", "or"],
+            "subtitleslangs": [
+                "en", "en-US", "en-IN", "hi", "ta", "te",
+                "kn", "ml", "bn", "mr", "gu", "pa", "or",
+            ],
             "subtitlesformat": "vtt",
             "outtmpl": output_template,
             "noplaylist": True,
-            "extractor_args": {"youtube": {"player_client": ["ios", "default"]}}
+            "socket_timeout": 30,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["mweb", "ios", "web"],
+                }
+            },
         }
+
+        # Cookie handling
+        cookies_file = None
         if auth_browser and auth_browser != "paste":
             ydl_opts["cookiesfrombrowser"] = (auth_browser,)
         elif cookies_content:
             cookies_file = Path(temp_dir) / "cookies.txt"
             cookies_file.write_text(cookies_content)
             ydl_opts["cookiefile"] = str(cookies_file)
-            
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            try:
+
+        # Step 1 — fetch metadata + subtitles
+        info = None
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
-            except Exception as e:
-                raise RuntimeError(f"YouTube block detected or metadata fetch failed: {e}")
+        except Exception as e:
+            err = str(e).lower()
+            if "sign in" in err or "bot" in err or "captcha" in err:
+                raise RuntimeError(
+                    "YouTube is blocking this request. Try pasting browser cookies "
+                    "or use a different video."
+                ) from e
+            raise RuntimeError(f"Could not fetch YouTube video: {e}") from e
 
         if not info:
-            raise RuntimeError("Could not fetch YouTube metadata. Video might be restricted.")
+            raise RuntimeError("Could not fetch YouTube metadata. The video might be private or restricted.")
 
         video_id = info.get("id")
         if not video_id:
-            raise RuntimeError("Missing YouTube video id.")
+            raise RuntimeError("Missing YouTube video ID in response.")
 
+        # Step 2 — try subtitles first
         subtitle_files = sorted(Path(temp_dir).glob(f"{video_id}*.vtt"))
-        
         transcript_text = ""
         picked_language = ""
 
-        if not subtitle_files:
-            # Fallback: transcribe audio using Groq Whisper API
-            ydl_opts_audio = {
-                "quiet": True,
-                "format": "m4a/bestaudio/best",
-                "outtmpl": str(Path(temp_dir) / f"{video_id}_audio.%(ext)s"),
-                "noplaylist": True,
-                "extractor_args": {"youtube": {"player_client": ["ios", "default"]}}
-            }
-            if auth_browser and auth_browser != "paste":
-                ydl_opts_audio["cookiesfrombrowser"] = (auth_browser,)
-            elif cookies_content:
-                cookies_file = Path(temp_dir) / "cookies.txt"
-                if not cookies_file.exists():
-                    cookies_file.write_text(cookies_content)
-                ydl_opts_audio["cookiefile"] = str(cookies_file)
-                
-            with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl_audio:
-                try:
-                    ydl_audio.extract_info(url, download=True)
-                except Exception as e:
-                    raise RuntimeError(f"No captions available and failed to download audio for transcription due to block: {e}")
-
-            audio_files = list(Path(temp_dir).glob(f"{video_id}_audio.*"))
-            if not audio_files:
-                raise RuntimeError("No captions available and failed to generate audio file for transcription.")
-            audio_file = audio_files[0]
-
-            import httpx
-            import os
-            sarvam_api_key = os.getenv("SARVAM_API_KEY", "")
-            if not sarvam_api_key or sarvam_api_key == "YOUR_SARVAM_API_KEY_HERE":
-                raise RuntimeError("No captions available. SARVAM_API_KEY is required for fallback audio transcription.")
-            
-            with open(audio_file, "rb") as f:
-                res = httpx.post(
-                    "https://api.sarvam.ai/speech-to-text",
-                    headers={"api-subscription-key": sarvam_api_key},
-                    data={"model": "saaras:v1"},
-                    files={"file": (audio_file.name, f)},
-                    timeout=300.0
-                )
-            if res.status_code == 413:
-                raise RuntimeError("The video is too long (file too large) for fallback audio transcription.")
-            
-            if res.status_code != 200:
-                raise RuntimeError(f"Sarvam API error {res.status_code}: {res.text}")
-                
-            res.raise_for_status()
-            
-            transcript_text = res.json().get("transcript", "").strip()
-            picked_language = res.json().get("language_code", "audio_fallback")
-            
-            if not transcript_text:
-                raise RuntimeError("Fallback audio transcription returned empty text.")
-        else:
+        if subtitle_files:
             for file_path in subtitle_files:
-                text = _parse_vtt_to_text(file_path.read_text(encoding="utf-8", errors="ignore"))
+                text = _parse_vtt_to_text(
+                    file_path.read_text(encoding="utf-8", errors="ignore")
+                )
                 if text:
                     transcript_text = text
                     suffix = file_path.stem.replace(video_id, "").strip(".")
                     picked_language = suffix or "unknown"
                     break
 
+        # Step 3 — fallback: download audio and transcribe via Groq Whisper
         if not transcript_text:
-            raise RuntimeError("Captions were found but the transcript could not be parsed.")
+            print("  [YouTube] No usable subtitles — falling back to audio transcription")
+
+            groq_key = os.getenv("GROQ_API_KEY", "")
+            sarvam_key = os.getenv("SARVAM_API_KEY", "")
+
+            if (not groq_key or groq_key == "YOUR_GROQ_API_KEY_HERE") and \
+               (not sarvam_key or sarvam_key == "YOUR_SARVAM_API_KEY_HERE"):
+                raise RuntimeError(
+                    "No subtitles found for this video. "
+                    "Set GROQ_API_KEY or SARVAM_API_KEY in .env for audio transcription fallback."
+                )
+
+            ydl_opts_audio: dict[str, Any] = {
+                "quiet": True,
+                "no_warnings": True,
+                "format": "m4a/bestaudio/best",
+                "outtmpl": str(Path(temp_dir) / f"{video_id}_audio.%(ext)s"),
+                "noplaylist": True,
+                "socket_timeout": 30,
+                "extractor_args": {
+                    "youtube": {"player_client": ["mweb", "ios", "web"]}
+                },
+            }
+            if auth_browser and auth_browser != "paste":
+                ydl_opts_audio["cookiesfrombrowser"] = (auth_browser,)
+            elif cookies_file and cookies_file.exists():
+                ydl_opts_audio["cookiefile"] = str(cookies_file)
+
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl_audio:
+                    ydl_audio.extract_info(url, download=True)
+            except Exception as e:
+                raise RuntimeError(
+                    f"No subtitles available and audio download failed: {e}"
+                ) from e
+
+            audio_files = list(Path(temp_dir).glob(f"{video_id}_audio.*"))
+            if not audio_files:
+                raise RuntimeError(
+                    "No subtitles found and could not download audio for transcription."
+                )
+            audio_file = audio_files[0]
+
+            # Check file size (25MB limit for Groq Whisper, Sarvam has its own)
+            file_size_mb = audio_file.stat().st_size / (1024 * 1024)
+            if file_size_mb > 25:
+                raise RuntimeError(
+                    f"Audio file is too large ({file_size_mb:.0f}MB). "
+                    "Try a shorter video (under ~15 minutes)."
+                )
+
+            import httpx
+
+            # Try Groq Whisper first (faster, free)
+            if groq_key and groq_key != "YOUR_GROQ_API_KEY_HERE":
+                try:
+                    print(f"  [YouTube] Transcribing audio via Groq Whisper ({file_size_mb:.1f}MB)...")
+                    with open(audio_file, "rb") as f:
+                        res = httpx.post(
+                            "https://api.groq.com/openai/v1/audio/transcriptions",
+                            headers={"Authorization": f"Bearer {groq_key}"},
+                            data={"model": "whisper-large-v3-turbo"},
+                            files={"file": (audio_file.name, f, "audio/mp4")},
+                            timeout=120.0,
+                        )
+                    if res.status_code == 200:
+                        transcript_text = res.json().get("text", "").strip()
+                        picked_language = "whisper_auto"
+                        print(f"  [YouTube] ✅ Groq Whisper transcribed {len(transcript_text)} chars")
+                except Exception as whisper_err:
+                    print(f"  [YouTube] ⚠️ Groq Whisper failed: {whisper_err}")
+
+            # Fallback to Sarvam STT
+            if not transcript_text and sarvam_key and sarvam_key != "YOUR_SARVAM_API_KEY_HERE":
+                try:
+                    print(f"  [YouTube] Transcribing audio via Sarvam STT ({file_size_mb:.1f}MB)...")
+                    with open(audio_file, "rb") as f:
+                        res = httpx.post(
+                            "https://api.sarvam.ai/speech-to-text",
+                            headers={"api-subscription-key": sarvam_key},
+                            data={"model": "saaras:v1"},
+                            files={"file": (audio_file.name, f)},
+                            timeout=120.0,
+                        )
+                    if res.status_code == 200:
+                        transcript_text = res.json().get("transcript", "").strip()
+                        picked_language = res.json().get("language_code", "sarvam_auto")
+                        print(f"  [YouTube] ✅ Sarvam STT transcribed {len(transcript_text)} chars")
+                    elif res.status_code == 413:
+                        raise RuntimeError(
+                            "Video audio is too large for Sarvam API. Try a shorter video."
+                        )
+                    else:
+                        print(f"  [YouTube] ⚠️ Sarvam STT error {res.status_code}: {res.text[:200]}")
+                except RuntimeError:
+                    raise
+                except Exception as sarvam_err:
+                    print(f"  [YouTube] ⚠️ Sarvam STT failed: {sarvam_err}")
+
+            if not transcript_text:
+                raise RuntimeError(
+                    "Could not extract transcript from this video. "
+                    "No subtitles found and audio transcription failed."
+                )
 
         return {
             "title": info.get("title") or "YouTube Import",

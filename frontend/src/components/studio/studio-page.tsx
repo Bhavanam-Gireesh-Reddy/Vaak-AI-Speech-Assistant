@@ -729,7 +729,7 @@ export function StudioPageClient() {
     setError("");
     setYoutubeStatus("Importing transcript and creating a study session...");
     try {
-      const response = await fetch("/api/youtube/import", {
+      const response = await fetch("/api/proxy/youtube/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -829,67 +829,83 @@ export function StudioPageClient() {
   }
 
   async function handleOCRUpload(file: File | undefined) {
-    if (!file || !detail) return;
+    if (!file || !detail || busyKey === "ocr") return;
+
+    // Validate file before processing
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+    if (file.size > MAX_SIZE) {
+      setError(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum is 10MB.`);
+      return;
+    }
+    if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
+      setError("Please upload an image (PNG, JPG) or PDF file.");
+      return;
+    }
+
     setBusyKey("ocr");
     setError("");
+
     try {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const imageData = (event.target?.result as string).split(",")[1];
-        if (!imageData) {
-          setError("Invalid image file.");
-          return;
-        }
-        try {
-          const response = await fetch(`/api/sessions/${detail.session_id}/upload-notes`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              image_data: imageData,
-              file_type: file.type,
-            }),
-          });
-
-          const payload = await readJson<{
-            success: boolean;
-            extracted_text?: string;
-            character_count?: number;
-            error?: string;
-            setup_guide?: Record<string, unknown>;
-          }>(response);
-
-          if (!payload.success) {
-            const errorMsg = payload.error || "OCR processing failed";
-            if (payload.setup_guide) {
-              setError(
-                `${errorMsg}\n\nSetup guide:\n${Object.entries(payload.setup_guide)
-                  .map(([key, val]) => `${key}: ${val}`)
-                  .join("\n")}`
-              );
-            } else {
-              setError(errorMsg);
-            }
-            setBusyKey("");
+      // Read file as base64 using a Promise wrapper (not a loose callback)
+      const imageData = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const result = event.target?.result as string;
+          const base64 = result?.split(",")[1];
+          if (!base64) {
+            reject(new Error("Could not read the image file."));
             return;
           }
+          resolve(base64);
+        };
+        reader.onerror = () => reject(new Error("Failed to read the file."));
+        reader.readAsDataURL(file);
+      });
 
-          const existingNotes = detail.uploaded_notes ?? [];
-          existingNotes.push({
-            timestamp: new Date().toISOString(),
-            text: payload.extracted_text || "",
-            file_type: file.type,
-            confidence: "high",
-          });
-          updateDetail({ uploaded_notes: existingNotes });
-        } catch (uploadError) {
-          setError(uploadError instanceof Error ? uploadError.message : "OCR upload failed.");
-        } finally {
-          setBusyKey("");
+      const response = await fetch(`/api/proxy/sessions/${detail.session_id}/upload-notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image_data: imageData,
+          file_type: file.type || "image/png",
+        }),
+      });
+
+      const payload = await readJson<{
+        success: boolean;
+        extracted_text?: string;
+        character_count?: number;
+        confidence?: string;
+        method?: string;
+        error?: string;
+        setup_guide?: Record<string, unknown>;
+      }>(response);
+
+      if (!payload.success) {
+        const errorMsg = payload.error || "OCR processing failed";
+        if (payload.setup_guide) {
+          setError(
+            `${errorMsg}\n\nSetup guide:\n${Object.entries(payload.setup_guide)
+              .map(([key, val]) => `${key}: ${val}`)
+              .join("\n")}`
+          );
+        } else {
+          setError(errorMsg);
         }
+        return;
+      }
+
+      const newNote = {
+        timestamp: new Date().toISOString(),
+        text: payload.extracted_text || "",
+        file_type: file.type || "image/png",
+        confidence: payload.confidence || "high",
       };
-      reader.readAsDataURL(file);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "File reading failed.");
+      const updatedNotes = [...(detail.uploaded_notes ?? []), newNote];
+      updateDetail({ uploaded_notes: updatedNotes });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "OCR upload failed. Please try again.");
+    } finally {
       setBusyKey("");
     }
   }
@@ -1534,37 +1550,58 @@ export function StudioPageClient() {
                   subtitle="Upload and extract text from handwritten notes or images."
                 >
                   <div className="space-y-4">
-                    <div
-                      className="rounded-3xl p-6 text-center transition cursor-pointer hover:opacity-90"
-                      style={{
-                        border: "2px dashed rgba(255,255,255,0.12)",
-                        background: "rgba(255,255,255,0.02)",
-                      }}
-                      onClick={() => {
-                        const input = document.createElement("input");
-                        input.type = "file";
-                        input.accept = "image/*";
-                        input.onchange = (e: Event) => {
-                          const target = e.target as HTMLInputElement;
-                          void handleOCRUpload(target.files?.[0]);
-                        };
-                        input.click();
-                      }}
-                    >
-                      <Upload
-                        className="h-8 w-8 mx-auto mb-2"
-                        style={{ color: "rgba(255,255,255,0.35)" }}
-                      />
-                      <p className="text-sm font-semibold text-white">
-                        Click to upload image
-                      </p>
-                      <p
-                        className="text-xs mt-1"
-                        style={{ color: "rgba(255,255,255,0.35)" }}
+                    {busyKey === "ocr" ? (
+                      <div
+                        className="rounded-3xl p-6 text-center"
+                        style={{
+                          border: "2px dashed rgba(124,58,237,0.4)",
+                          background: "rgba(124,58,237,0.06)",
+                        }}
                       >
-                        PNG, JPG, or PDF up to 10MB
-                      </p>
-                    </div>
+                        <div className="h-8 w-8 mx-auto mb-3 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "rgba(124,58,237,0.5)", borderTopColor: "transparent" }} />
+                        <p className="text-sm font-semibold text-white">
+                          Extracting text from image...
+                        </p>
+                        <p
+                          className="text-xs mt-1"
+                          style={{ color: "rgba(255,255,255,0.4)" }}
+                        >
+                          This may take a few seconds
+                        </p>
+                      </div>
+                    ) : (
+                      <div
+                        className="rounded-3xl p-6 text-center transition cursor-pointer hover:opacity-90"
+                        style={{
+                          border: "2px dashed rgba(255,255,255,0.12)",
+                          background: "rgba(255,255,255,0.02)",
+                        }}
+                        onClick={() => {
+                          const input = document.createElement("input");
+                          input.type = "file";
+                          input.accept = "image/*,.pdf";
+                          input.onchange = (e: Event) => {
+                            const target = e.target as HTMLInputElement;
+                            void handleOCRUpload(target.files?.[0]);
+                          };
+                          input.click();
+                        }}
+                      >
+                        <Upload
+                          className="h-8 w-8 mx-auto mb-2"
+                          style={{ color: "rgba(255,255,255,0.35)" }}
+                        />
+                        <p className="text-sm font-semibold text-white">
+                          Click to upload image
+                        </p>
+                        <p
+                          className="text-xs mt-1"
+                          style={{ color: "rgba(255,255,255,0.35)" }}
+                        >
+                          PNG, JPG, or PDF up to 10MB
+                        </p>
+                      </div>
+                    )}
 
                     {detail.uploaded_notes && detail.uploaded_notes.length > 0 && (
                       <div className="space-y-3 max-h-[400px] overflow-y-auto">

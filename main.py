@@ -100,8 +100,28 @@ FRONTEND_URL   = os.getenv("FRONTEND_URL",   "").rstrip("/")
 
 SAMPLE_RATE   = 16000
 CHANNELS      = 1
-CHUNK_BYTES   = int(SAMPLE_RATE * 0.5 * 2)
-SENTENCE_ENDS = re.compile(r'[.!?।]\s*$')
+CHUNK_BYTES   = int(SAMPLE_RATE * 0.5 * 2)    # 500ms chunks — stable for all languages
+# Sentence-end punctuation: Latin (.!?) + Hindi danda (।) + double danda (॥)
+# + Telugu/Kannada/Malayalam full stop (.) in their Sarvam output
+SENTENCE_ENDS = re.compile(r'[.!?।॥]\s*$')
+
+# Indic Unicode ranges — used to skip Latin-only filters on Indic text
+_INDIC_RE = re.compile(
+    r'[\u0C00-\u0C7F'   # Telugu
+    r'\u0900-\u097F'     # Devanagari (Hindi/Marathi)
+    r'\u0980-\u09FF'     # Bengali
+    r'\u0A00-\u0A7F'     # Gurmukhi (Punjabi)
+    r'\u0A80-\u0AFF'     # Gujarati
+    r'\u0B00-\u0B7F'     # Odia
+    r'\u0B80-\u0BFF'     # Tamil
+    r'\u0C80-\u0CFF'     # Kannada
+    r'\u0D00-\u0D7F'     # Malayalam
+    r']'
+)
+
+def _is_indic(text: str) -> bool:
+    """Return True if text contains any Indic script character."""
+    return bool(_INDIC_RE.search(text))
 
 db_client      = None
 db_collection  = None
@@ -679,8 +699,6 @@ async def session_chat(session_id: str, body: dict, request: Request, x_api_key:
 
 @app.post("/api/youtube/import")
 async def youtube_import(body: dict, request: Request, x_api_key: str = Header(default="")):
-    if not AI_FEATURES_AVAILABLE:
-        return JSONResponse({"error": "AI features are not available"}, status_code=503)
     if db_collection is None:
         return JSONResponse({"error": "MongoDB not connected"}, status_code=503)
     user = await get_authenticated_user(request, x_api_key)
@@ -747,8 +765,9 @@ def is_sentence_end(text: str) -> bool:
 
 def merge_fragments(fragments: list) -> str:
     joined = " ".join(f.strip() for f in fragments if f.strip())
-    joined = re.sub(r'\s+', ' ', joined).strip()
-    if joined:
+    joined = re.sub(r'[^\S\n]+', ' ', joined).strip()   # collapse spaces but keep structure
+    if joined and not _is_indic(joined):
+        # Only uppercase the first character for Latin scripts
         joined = joined[0].upper() + joined[1:]
     return joined
 
@@ -824,7 +843,7 @@ async def resolve_title(raw_title: str, user_id: str = "") -> str:
 async def save_to_mongo(session_id, started_at, language, mode,
                         sentences, filtered_transcript="", summary="", corrected_transcript="", title="", notes="", user_id="", speakers=None, extra_fields=None):
     if db_collection is None:
-        print("  [DB] Skipped — MongoDB not connected")
+        print(f"  [DB] ❌ SKIPPED saving session {session_id} — MongoDB not connected! {len(sentences)} sentences lost.")
         return
     if not sentences:
         print("  [DB] Skipped — no sentences to save")
@@ -1119,10 +1138,24 @@ async def v1_list_sessions(
     if db_collection is None:
         return JSONResponse({"error": "DB not connected"}, status_code=503)
     skip   = (page - 1) * limit
-    query  = {"user_id": user["sub"]} if AUTH_AVAILABLE else {}
+    # Include sessions owned by this user AND orphaned sessions (empty user_id)
+    if AUTH_AVAILABLE:
+        query = {"$or": [{"user_id": user["sub"]}, {"user_id": ""}]}
+    else:
+        query = {}
     cursor = db_collection.find(query, {"_id": 0, "sentences": 0}).sort("started_at", -1).skip(skip).limit(limit)
     total  = await db_collection.count_documents(query)
     items  = await cursor.to_list(length=limit)
+    # Claim orphaned sessions for this user so they show up correctly next time
+    if AUTH_AVAILABLE and any(s.get("user_id") == "" for s in items):
+        orphan_ids = [s["session_id"] for s in items if s.get("user_id") == ""]
+        await db_collection.update_many(
+            {"session_id": {"$in": orphan_ids}, "user_id": ""},
+            {"$set": {"user_id": user["sub"]}},
+        )
+        for s in items:
+            if s.get("user_id") == "":
+                s["user_id"] = user["sub"]
     return JSONResponse({"page": page, "limit": limit, "total": total, "sessions": items})
 
 
@@ -1297,6 +1330,10 @@ async def translate_ws(client_ws: WebSocket):
             payload = decode_token(token)
             if payload:
                 ws_user_id = payload.get("sub", "")
+            else:
+                print(f"  [Auth] ⚠️ WebSocket token decode failed (expired or invalid)")
+        else:
+            print(f"  [Auth] ⚠️ No auth token provided to WebSocket — session will have no user_id")
 
     try:
         settings_raw = await asyncio.wait_for(client_ws.receive_text(), timeout=10)
@@ -1330,17 +1367,23 @@ async def translate_ws(client_ws: WebSocket):
     pcm_buffer     = bytearray()
     session_active = True
 
-    print(f"[Session] {session_id} started | mode={mode} lang={language_code}")
+    # Languages where Sarvam STT sentence-end punctuation is least reliable
+    # get a shorter idle flush timeout to avoid losing lines.
+    # Hindi (hi-IN) and English (en-IN) work well at 1.5s — leave them alone.
+    _FAST_FLUSH_LANGS = {"te-IN", "kn-IN", "ml-IN", "or-IN"}
+    idle_timeout = 0.8 if language_code in _FAST_FLUSH_LANGS else 1.5
+
+    print(f"[Session] {session_id} started | mode={mode} lang={language_code} idle_timeout={idle_timeout}s")
 
     sarvam_client = AsyncSarvamAI(api_subscription_key=SARVAM_API_KEY)
 
     # ── Flush idle fragments ──────────────────────────────────────────────────
     async def flush_idle():
         while session_active:
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.2)
             if frag_buf:
                 elapsed = asyncio.get_event_loop().time() - last_frag_t[0]
-                if elapsed >= 1.5:
+                if elapsed >= idle_timeout:
                     sentence = merge_fragments(frag_buf)
                     frag_buf.clear()
                     if sentence:
@@ -1484,41 +1527,52 @@ async def translate_ws(client_ws: WebSocket):
 
     # ── WebSocket is STILL OPEN here — process + send results ────────────────
     if all_sentences:
-        try:
-            # 1. Notify browser: processing started
-            await broadcast_event(session_id, client_ws, {
-                "type": "processing",
-                "message": f"Analysing {len(all_sentences)} sentences with AI..."
-            })
-        except Exception:
-            pass
+        if AUTH_AVAILABLE and not ws_user_id:
+            print(f"  [Auth] ⚠️ ws_user_id is empty — session will be saved without user ownership")
 
         result = {"summary": "", "filtered_transcript": ""}
-        if LLM_AVAILABLE and os.getenv("GROQ_API_KEY", "") not in ("", "YOUR_GROQ_API_KEY_HERE"):
-            print(f"  [LLM] Calling Groq...")
-            result = await process_session(all_sentences)
-        else:
-            print(f"  [LLM] Skipped — LLM_AVAILABLE={LLM_AVAILABLE}, key set={GROQ_API_KEY != 'YOUR_GROQ_API_KEY_HERE'}")
-
-        # 2. Send analysis results to browser while connection is open
         try:
-            await broadcast_event(session_id, client_ws, {
-                "type":                "session_analysis",
-                "summary":             result.get("summary", ""),
-                "notes":               result.get("notes", ""),
-                "filtered_transcript": result.get("filtered_transcript", ""),
-                "corrected_transcript":result.get("corrected_transcript", ""),
-                "title":               result.get("title", ""),
-                "speakers":            result.get("speakers", []),
-            })
-            print(f"  [LLM] Sent → title:'{result.get('title','')}' summary:{len(result.get('summary',''))} chars notes:{len(result.get('notes',''))} chars")
-        except Exception as e:
-            print(f"  [LLM] Send error: {e}")
+            try:
+                # 1. Notify browser: processing started
+                await broadcast_event(session_id, client_ws, {
+                    "type": "processing",
+                    "message": f"Analysing {len(all_sentences)} sentences with AI..."
+                })
+            except Exception:
+                pass
 
-        # 3. Save to MongoDB
-        raw_title   = result.get("title", "")
-        final_user_id = ws_user_id if ws_user_id else "local"  # Fallback to "local" if no auth
-        final_title = await resolve_title(raw_title, final_user_id)
+            if LLM_AVAILABLE and os.getenv("GROQ_API_KEY", "") not in ("", "YOUR_GROQ_API_KEY_HERE"):
+                print(f"  [LLM] Calling Groq...")
+                result = await process_session(all_sentences)
+            else:
+                print(f"  [LLM] Skipped — LLM_AVAILABLE={LLM_AVAILABLE}, key set={GROQ_API_KEY != 'YOUR_GROQ_API_KEY_HERE'}")
+
+            # 2. Send analysis results to browser while connection is open
+            try:
+                await broadcast_event(session_id, client_ws, {
+                    "type":                "session_analysis",
+                    "summary":             result.get("summary", ""),
+                    "notes":               result.get("notes", ""),
+                    "filtered_transcript": result.get("filtered_transcript", ""),
+                    "corrected_transcript":result.get("corrected_transcript", ""),
+                    "title":               result.get("title", ""),
+                    "speakers":            result.get("speakers", []),
+                })
+                print(f"  [LLM] Sent → title:'{result.get('title','')}' summary:{len(result.get('summary',''))} chars notes:{len(result.get('notes',''))} chars")
+            except Exception as e:
+                print(f"  [LLM] Send error: {e}")
+        except Exception as e:
+            print(f"  [LLM] ❌ Processing error (will still save session): {e}")
+
+        # 3. Save to MongoDB — always runs even if LLM/broadcast failed
+        final_user_id = ws_user_id if ws_user_id else "local"
+        try:
+            raw_title   = result.get("title", "")
+            final_title = await resolve_title(raw_title, final_user_id)
+        except Exception as e:
+            print(f"  [DB] ⚠️ resolve_title error: {e}")
+            final_title = result.get("title", "")
+
         await save_to_mongo(
             session_id, started_at, language_code, mode,
             list(all_sentences),
@@ -1608,7 +1662,8 @@ async def process_sarvam_msg(msg, client_ws, mode, frag_buf, last_frag_t, all_se
             text = str(text).strip()
             if AI_FEATURES_AVAILABLE and custom_vocabulary:
                 text = apply_custom_vocabulary(text, custom_vocabulary)
-            if len(text) <= 2 and text[-1:] not in '.!?।':
+            # Drop very short Latin fragments (noise), but keep Indic — short Indic words are valid
+            if len(text) <= 2 and text[-1:] not in '.!?।॥' and not _is_indic(text):
                 return
 
             print(f"  [fragment] '{text}'")
@@ -1666,30 +1721,33 @@ async def session_action_items(session_id: str, body: dict, request: Request, x_
     summary="Upload and process handwritten notes with OCR",
     tags=["AI Features"])
 async def session_upload_notes(session_id: str, request: Request, x_api_key: str = Header(default="")):
-    if not AI_FEATURES_AVAILABLE:
-        return JSONResponse({"error": "AI features are not available"}, status_code=503)
+    # OCR works even without AI_FEATURES if Groq Vision is available
     result, error = await get_session_for_user(session_id, request, x_api_key)
     if error:
         return error
     doc, user = result
-    
+
     try:
         body = await request.json()
     except Exception as e:
-        return JSONResponse({"success": False, "error": f"Invalid JSON: {str(e)}"}, status_code=400)
-    
+        return JSONResponse({"success": False, "error": f"Invalid request body: {e}"}, status_code=400)
+
     image_base64 = body.get("image_data", "")
     file_type = body.get("file_type", "image/png")
-    
+
     if not image_base64:
         return JSONResponse({"success": False, "error": "No image data provided"}, status_code=400)
-    
-    ocr_result = await process_ocr_from_image(image_base64, file_type)
-    
+
+    try:
+        ocr_result = await process_ocr_from_image(image_base64, file_type)
+    except Exception as e:
+        print(f"  [OCR] ❌ Unhandled error: {e}")
+        return JSONResponse({"success": False, "error": f"OCR processing error: {e}"}, status_code=500)
+
     if not ocr_result.get("success"):
         response_data = {
             "success": False,
-            "error": ocr_result.get("error", "OCR processing failed")
+            "error": ocr_result.get("error", "OCR processing failed"),
         }
         if "setup_guide" in ocr_result:
             response_data["setup_guide"] = ocr_result["setup_guide"]
@@ -1718,6 +1776,49 @@ async def session_upload_notes(session_id: str, request: Request, x_api_key: str
         "method": ocr_result.get("method", "unknown")
     })
 
+
+
+@app.post("/api/ocr/extract",
+    summary="Extract text from an image using OCR (standalone, no session needed)",
+    tags=["AI Features"])
+async def ocr_extract(request: Request, x_api_key: str = Header(default="")):
+    user = await require_api_auth(request, x_api_key)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+    try:
+        body = await request.json()
+    except Exception as e:
+        return JSONResponse({"success": False, "error": f"Invalid request body: {e}"}, status_code=400)
+
+    image_base64 = body.get("image_data", "")
+    file_type = body.get("file_type", "image/png")
+
+    if not image_base64:
+        return JSONResponse({"success": False, "error": "No image data provided"}, status_code=400)
+
+    try:
+        ocr_result = await process_ocr_from_image(image_base64, file_type)
+    except Exception as e:
+        print(f"  [OCR] ❌ Unhandled error: {e}")
+        return JSONResponse({"success": False, "error": f"OCR processing error: {e}"}, status_code=500)
+
+    if not ocr_result.get("success"):
+        response_data = {
+            "success": False,
+            "error": ocr_result.get("error", "OCR processing failed"),
+        }
+        if "setup_guide" in ocr_result:
+            response_data["setup_guide"] = ocr_result["setup_guide"]
+        return JSONResponse(response_data, status_code=400)
+
+    return JSONResponse({
+        "success": True,
+        "extracted_text": ocr_result.get("text", ""),
+        "character_count": ocr_result.get("character_count", 0),
+        "confidence": ocr_result.get("confidence", "medium"),
+        "method": ocr_result.get("method", "unknown"),
+    })
 
 
 @app.get("/api/sessions/suggest-folder",
