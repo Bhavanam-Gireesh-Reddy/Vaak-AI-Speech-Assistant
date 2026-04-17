@@ -978,7 +978,7 @@ export function StudioPageClient() {
       {/* ══════════════════════════════════════════════════════════════════
           ROW 1 — YouTube Import  |  Sessions list
       ══════════════════════════════════════════════════════════════════ */}
-      <section className="grid gap-5 md:grid-cols-2">
+      <section className="grid gap-5">
         {/* YouTube import */}
         <StudioCard
           subtitle={youtubeStatus}
@@ -1096,7 +1096,7 @@ export function StudioPageClient() {
           {/* ══════════════════════════════════════════════════════════════════
               ROW 2 — Session info  |  4 metric cards
           ══════════════════════════════════════════════════════════════════ */}
-          <section className="grid gap-5 md:grid-cols-2">
+          <section className="grid gap-5">
             <StudioCard
               subtitle={
                 detail.source_type === "youtube"
@@ -1125,7 +1125,7 @@ export function StudioPageClient() {
               </div>
             </StudioCard>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
               <MetricCard label="Words" value={(detail.word_count ?? 0).toLocaleString()} />
               <MetricCard label="Sentences" value={(detail.sentence_count ?? 0).toLocaleString()} />
               <MetricCard label="Speakers" value={(detail.speakers?.length ?? 0).toLocaleString()} />
@@ -1134,63 +1134,67 @@ export function StudioPageClient() {
           </section>
 
           {/* ══════════════════════════════════════════════════════════════════
-              ROW 3 — Summary & Notes  |  Speakers & Sentiment
+              ROW 3 — Summary & Notes  (full width)
           ══════════════════════════════════════════════════════════════════ */}
-          <section className="grid gap-5 md:grid-cols-2">
-            <StudioCard bodyClassName="h-full" className="h-full" title="Summary and notes">
-              <pre className="h-full min-h-[300px] whitespace-pre-wrap break-words rounded-3xl p-5 font-mono text-sm leading-7"
-                style={{ ...SUBCARD, color: "rgba(255,255,255,0.65)" }}>
-                {[
-                  detail.summary ? `SUMMARY\n${detail.summary}` : "",
-                  detail.notes ? `NOTES\n${detail.notes}` : "",
-                  `TRANSCRIPT PREVIEW\n${(transcript || "No transcript stored yet.").slice(0, 1200)}${transcript.length > 1200 ? "\n\n..." : ""}`,
-                ].filter(Boolean).join("\n\n")}
-              </pre>
-            </StudioCard>
-
-            <StudioCard bodyClassName="h-full" className="h-full" title="Speakers and sentiment">
-              <div className="flex h-full min-h-[300px] flex-col gap-4">
-                {detail.speakers?.length ? (
-                  <div className="max-h-[180px] space-y-2 overflow-y-auto pr-1">
-                    {detail.speakers.map((speaker, index) => (
-                      <div key={`${speaker.speaker ?? "speaker"}-${index}`}
-                        className="flex gap-3 rounded-2xl p-3" style={SUBCARD}>
-                        <span className="flex h-fit min-w-[80px] items-center justify-center rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em]"
-                          style={{ background: "rgba(0,212,255,0.1)", color: "#00d4ff" }}>
-                          {speaker.speaker || "Speaker"}
-                        </span>
-                        <p className="break-words text-sm leading-6" style={{ color: "rgba(255,255,255,0.65)" }}>
-                          {speaker.text || ""}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-2xl p-4 text-sm" style={{ ...SUBCARD, color: "rgba(255,255,255,0.35)" }}>
-                    Speaker detection is not available for this session yet.
-                  </div>
-                )}
-                <div className="mt-auto grid grid-cols-3 gap-3">
-                  {[
-                    { label: "Overall", value: (detail.sentiment_summary?.overall ?? "neutral").toUpperCase() },
-                    { label: "Pos/Neu/Neg", value: `${detail.sentiment_summary?.counts?.positive ?? 0}/${detail.sentiment_summary?.counts?.neutral ?? 0}/${detail.sentiment_summary?.counts?.negative ?? 0}` },
-                    { label: "Timeline", value: `${(detail.sentiment_timeline?.length ?? 0).toLocaleString()} pts` },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="flex min-h-[100px] flex-col justify-between rounded-2xl p-4" style={SUBCARD}>
-                      <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: "rgba(255,255,255,0.4)" }}>{label}</p>
-                      <p className="text-base font-bold text-white">{value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </StudioCard>
-          </section>
+          <StudioCard title="Summary and notes">
+            <pre className="min-h-[200px] whitespace-pre-wrap break-words rounded-3xl p-5 font-mono text-sm leading-7"
+              style={{ ...SUBCARD, color: "rgba(255,255,255,0.65)" }}>
+              {[
+                detail.summary ? `SUMMARY\n${detail.summary}` : "",
+                detail.notes ? `NOTES\n${detail.notes}` : "",
+                `TRANSCRIPT PREVIEW\n${(transcript || "No transcript stored yet.").slice(0, 1200)}${transcript.length > 1200 ? "\n\n..." : ""}`,
+              ].filter(Boolean).join("\n\n")}
+            </pre>
+          </StudioCard>
 
           {/* ══════════════════════════════════════════════════════════════════
-              ROW 4 — Translation  |  Rich Notes
+              ROW 3b — Speakers  (full width)
           ══════════════════════════════════════════════════════════════════ */}
-          <section className="grid gap-5 md:grid-cols-2">
-            <StudioCard bodyClassName="h-full" className="h-full" title="Multi-language output"
+          <StudioCard title="Speakers">
+            {detail.speakers?.length ? (
+              <div className="max-h-[260px] space-y-2 overflow-y-auto pr-1">
+                {detail.speakers.map((speaker, index) => (
+                  <div key={`${speaker.speaker ?? "speaker"}-${index}`}
+                    className="flex gap-3 rounded-2xl p-3" style={SUBCARD}>
+                    <span className="flex h-fit min-w-[80px] items-center justify-center rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em]"
+                      style={{ background: "rgba(0,212,255,0.1)", color: "#00d4ff" }}>
+                      {speaker.speaker || "Speaker"}
+                    </span>
+                    <p className="break-words text-sm leading-6" style={{ color: "rgba(255,255,255,0.65)" }}>
+                      {speaker.text || ""}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl p-4 text-sm" style={{ ...SUBCARD, color: "rgba(255,255,255,0.35)" }}>
+                Speaker detection is not available for this session yet.
+              </div>
+            )}
+          </StudioCard>
+
+          {/* ══════════════════════════════════════════════════════════════════
+              ROW 3c — Sentiment Analysis  (full width)
+          ══════════════════════════════════════════════════════════════════ */}
+          <StudioCard title="Sentiment analysis">
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: "Overall", value: (detail.sentiment_summary?.overall ?? "neutral").toUpperCase() },
+                { label: "Pos/Neu/Neg", value: `${detail.sentiment_summary?.counts?.positive ?? 0}/${detail.sentiment_summary?.counts?.neutral ?? 0}/${detail.sentiment_summary?.counts?.negative ?? 0}` },
+                { label: "Timeline", value: `${(detail.sentiment_timeline?.length ?? 0).toLocaleString()} pts` },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex min-h-[100px] flex-col justify-between rounded-2xl p-4" style={SUBCARD}>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: "rgba(255,255,255,0.4)" }}>{label}</p>
+                  <p className="text-base font-bold text-white">{value}</p>
+                </div>
+              ))}
+            </div>
+          </StudioCard>
+
+          {/* ══════════════════════════════════════════════════════════════════
+              ROW 4 — Translation  (full width)
+          ══════════════════════════════════════════════════════════════════ */}
+          <StudioCard title="Multi-language output"
               subtitle="Generate and cache translated transcript output on demand."
               actions={
                 <div className="flex flex-wrap items-center gap-3">
@@ -1214,7 +1218,10 @@ export function StudioPageClient() {
               </pre>
             </StudioCard>
 
-            <StudioCard bodyClassName="h-full" className="h-full" title="Rich notes"
+          {/* ══════════════════════════════════════════════════════════════════
+              ROW 4b — Rich Notes  (full width)
+          ══════════════════════════════════════════════════════════════════ */}
+            <StudioCard title="Rich notes"
               subtitle="Extract detailed study notes from the selected session."
               actions={
                 <div className="flex flex-wrap gap-3">
@@ -1233,13 +1240,11 @@ export function StudioPageClient() {
                 {detail.rich_notes || "No rich notes generated yet."}
               </pre>
             </StudioCard>
-          </section>
 
           {/* ══════════════════════════════════════════════════════════════════
-              ROW 5 — Flashcards  |  Quiz
+              ROW 5 — Flashcards  (full width)
           ══════════════════════════════════════════════════════════════════ */}
-          <section className="grid gap-5 md:grid-cols-2">
-            <StudioCard bodyClassName="h-full" className="h-full" title="Flashcards"
+            <StudioCard title="Flashcards"
               subtitle="Create revision cards grounded in the transcript."
               actions={
                 <div className="flex flex-wrap gap-2">
@@ -1281,7 +1286,10 @@ export function StudioPageClient() {
               )}
             </StudioCard>
 
-            <StudioCard bodyClassName="h-full" className="h-full" title="Quiz"
+          {/* ══════════════════════════════════════════════════════════════════
+              ROW 5b — Quiz  (full width)
+          ══════════════════════════════════════════════════════════════════ */}
+            <StudioCard title="Quiz"
               subtitle="Build a transcript-grounded multiple-choice quiz."
               actions={
                 <div className="flex flex-wrap gap-2">
@@ -1329,13 +1337,11 @@ export function StudioPageClient() {
                 </div>
               )}
             </StudioCard>
-          </section>
 
           {/* ══════════════════════════════════════════════════════════════════
-              ROW 6 — Podcast  |  Mind Map
+              ROW 6 — Podcast  (full width)
           ══════════════════════════════════════════════════════════════════ */}
-          <section className="grid gap-5 md:grid-cols-2">
-            <StudioCard bodyClassName="h-full" className="h-full" title="Podcast"
+            <StudioCard title="Podcast"
               subtitle="Generate a compact spoken recap from the selected transcript."
               actions={
                 <div className="flex flex-wrap gap-3">
@@ -1366,6 +1372,9 @@ export function StudioPageClient() {
               </div>
             </StudioCard>
 
+          {/* ══════════════════════════════════════════════════════════════════
+              ROW 6b — Mind Map  (full width)
+          ══════════════════════════════════════════════════════════════════ */}
             <StudioCard title="Mind map"
               subtitle="Generate a structured visual map of the session."
               actions={
@@ -1386,7 +1395,6 @@ export function StudioPageClient() {
                 title={detail.mind_map?.title || detail.title || "Mind Map"}
               />
             </StudioCard>
-          </section>
 
           {/* ══════════════════════════════════════════════════════════════════
               ROW 7 — Transcript Chat  (full width)
@@ -1435,11 +1443,9 @@ export function StudioPageClient() {
           </StudioCard>
 
           {/* ══════════════════════════════════════════════════════════════════
-              ROW 8 — Action Items  |  OCR Notes
+              ROW 8 — Action Items  (full width)
           ══════════════════════════════════════════════════════════════════ */}
-          <section className="grid items-stretch gap-5 md:grid-cols-2">
                 <StudioCard
-                  bodyClassName="h-full"
                   title="Action Items"
                   subtitle="Extract tasks and action items from the meeting transcript."
                   actions={
@@ -1520,8 +1526,10 @@ export function StudioPageClient() {
                   )}
                 </StudioCard>
 
+          {/* ══════════════════════════════════════════════════════════════════
+              ROW 8b — OCR Notes  (full width)
+          ══════════════════════════════════════════════════════════════════ */}
                 <StudioCard
-                  bodyClassName="h-full"
                   title="Handwritten Notes (OCR)"
                   subtitle="Upload and extract text from handwritten notes or images."
                 >
@@ -1614,7 +1622,6 @@ export function StudioPageClient() {
                     )}
                   </div>
                 </StudioCard>
-              </section>
             </>
           )}
     </div>

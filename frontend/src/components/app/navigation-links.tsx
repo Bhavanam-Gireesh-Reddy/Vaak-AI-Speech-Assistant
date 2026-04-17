@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Home,
   Headphones,
   LayoutDashboard,
   ListCollapse,
@@ -11,6 +12,7 @@ import {
 } from "lucide-react";
 
 const baseNavigation = [
+  { href: "/",          label: "Home",      icon: Home },
   { href: "/live",      label: "Live",      icon: Headphones },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/history",   label: "History",   icon: ListCollapse },

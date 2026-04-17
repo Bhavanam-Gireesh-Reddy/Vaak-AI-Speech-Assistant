@@ -5,10 +5,8 @@ import {
   Download,
   Headphones,
   Mic,
-  MicOff,
   Square,
   Upload,
-  Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -213,7 +211,7 @@ export function LivePage() {
       const sliceW = W / bufLen; let x = 0;
       for (let i = 0; i < bufLen; i++) {
         const y = (wavData[i] / 128.0 * H) / 2;
-        i === 0 ? ctx!.moveTo(x, y) : ctx!.lineTo(x, y);
+        if (i === 0) { ctx!.moveTo(x, y); } else { ctx!.lineTo(x, y); }
         x += sliceW;
       }
       ctx!.lineTo(W, H / 2);
@@ -395,8 +393,15 @@ export function LivePage() {
     }
     mediaStreamRef.current = stream;
 
-    const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${wsProto}//${window.location.host}/ws/translate`;
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || window.location.origin;
+    const wsBase = apiBase.replace(/^http/, "ws") + "/ws/translate";
+    let wsToken = "";
+    try {
+      const t = await fetch("/api/ws-token");
+      const j = await t.json() as { token?: string | null };
+      wsToken = j.token ?? "";
+    } catch { /* ignore — anonymous session */ }
+    const wsUrl = wsToken ? `${wsBase}?token=${encodeURIComponent(wsToken)}` : wsBase;
     const ws = new WebSocket(wsUrl);
     ws.binaryType = "arraybuffer";
     wsRef.current = ws;
@@ -488,8 +493,15 @@ registerProcessor('pcm-processor', PCMProcessor);
       const resampled = await offline.startRendering();
       const pcmData = resampled.getChannelData(0);
 
-      const wsProto = window.location.protocol === "https:" ? "wss" : "ws";
-      const ws = new WebSocket(`${wsProto}://${window.location.host}/ws/translate`);
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || window.location.origin;
+      const wsBase2 = apiBase.replace(/^http/, "ws") + "/ws/translate";
+      let wsToken2 = "";
+      try {
+        const t2 = await fetch("/api/ws-token");
+        const j2 = await t2.json() as { token?: string | null };
+        wsToken2 = j2.token ?? "";
+      } catch { /* ignore */ }
+      const ws = new WebSocket(wsToken2 ? `${wsBase2}?token=${encodeURIComponent(wsToken2)}` : wsBase2);
       ws.binaryType = "arraybuffer";
       wsRef.current = ws;
 
@@ -630,7 +642,7 @@ registerProcessor('pcm-processor', PCMProcessor);
     error: "#f87171",
   };
 
-  const uniqueSpeakers = [...new Set(speakers.map((s) => s.speaker))];
+  const uniqueSpeakers = Array.from(new Set(speakers.map((s) => s.speaker)));
   const speakerColorMap: Record<string, typeof SPEAKER_COLORS[0]> = {};
   uniqueSpeakers.forEach((sp, i) => { speakerColorMap[sp] = SPEAKER_COLORS[i % SPEAKER_COLORS.length]; });
 
