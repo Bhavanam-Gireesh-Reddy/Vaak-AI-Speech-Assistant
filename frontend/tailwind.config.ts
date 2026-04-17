@@ -8,6 +8,9 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      gridTemplateColumns: {
+        "14": "repeat(14, minmax(0, 1fr))",
+      },
       colors: {
         background: "var(--background)",
         border: "var(--border)",

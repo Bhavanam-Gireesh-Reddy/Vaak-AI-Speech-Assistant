@@ -34,6 +34,7 @@ import {
   getSessionDateLabel,
 } from "@/lib/session-utils";
 
+/* ── Types ──────────────────────────────────────────────────────── */
 type SessionItem = {
   session_id: string;
   title?: string;
@@ -104,6 +105,40 @@ type SessionDetail = SessionItem & {
   [key: string]: unknown;
 };
 
+/* ── Design tokens ───────────────────────────────────────────────── */
+const CARD: React.CSSProperties = {
+  background: "rgba(255,255,255,0.03)",
+  backdropFilter: "blur(20px)",
+  WebkitBackdropFilter: "blur(20px)",
+  border: "1px solid rgba(255,255,255,0.08)",
+  boxShadow: "0 8px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)",
+};
+
+const SUBCARD: React.CSSProperties = {
+  background: "rgba(255,255,255,0.03)",
+  border: "1px solid rgba(255,255,255,0.06)",
+};
+
+const GRADIENT_TEXT: React.CSSProperties = {
+  background: "linear-gradient(135deg, #ffffff 20%, #a78bfa 60%, #00d4ff 100%)",
+  WebkitBackgroundClip: "text",
+  WebkitTextFillColor: "transparent",
+  backgroundClip: "text",
+};
+
+const INPUT_STYLE: React.CSSProperties = {
+  background: "rgba(255,255,255,0.05)",
+  border: "1px solid rgba(255,255,255,0.1)",
+  color: "rgba(255,255,255,0.85)",
+};
+
+const SELECT_STYLE: React.CSSProperties = {
+  background: "rgba(20,20,30,0.95)",
+  border: "1px solid rgba(255,255,255,0.12)",
+  color: "rgba(255,255,255,0.85)",
+  colorScheme: "dark",
+};
+
 const translationOptions = [
   ["same", "Original transcript"],
   ["en", "English"],
@@ -124,13 +159,12 @@ const translationOptions = [
   ["ar", "Arabic"],
 ] as const;
 
+/* ── Helpers ─────────────────────────────────────────────────────── */
 async function readJson<T>(response: Response) {
   try {
-    // Check if response has content
     if (response.status === 204) {
       return {} as T;
     }
-    
     const text = await response.text();
     if (!text) {
       if (!response.ok) {
@@ -138,7 +172,6 @@ async function readJson<T>(response: Response) {
       }
       return {} as T;
     }
-    
     const payload = JSON.parse(text) as T & { error?: string };
     if (!response.ok) {
       throw new Error(payload.error ?? `HTTP ${response.status}: Request failed.`);
@@ -152,6 +185,7 @@ async function readJson<T>(response: Response) {
   }
 }
 
+/* ── Sub-components ──────────────────────────────────────────────── */
 function StudioCard({
   children,
   title,
@@ -169,18 +203,34 @@ function StudioCard({
 }) {
   return (
     <section
-      className={`overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm ${className ?? ""}`}
+      className={`relative overflow-hidden rounded-2xl p-5 md:p-6 ${className ?? ""}`}
+      style={CARD}
     >
-      <div className="flex flex-col gap-2 sm:gap-3 md:gap-4">
+      {/* Subtle top-left corner glow */}
+      <div
+        className="pointer-events-none absolute top-0 left-0 h-24 w-24"
+        style={{ background: "radial-gradient(circle at top left, rgba(124,58,237,0.06) 0%, transparent 70%)" }}
+      />
+      <div className="relative flex flex-col gap-2 sm:gap-3 md:gap-4">
         <div className="min-w-0">
-          <h3 className="text-sm sm:text-base md:text-lg font-semibold text-slate-950">{title}</h3>
+          <h3
+            className="text-sm sm:text-base md:text-lg font-bold"
+            style={GRADIENT_TEXT}
+          >
+            {title}
+          </h3>
           {subtitle ? (
-            <p className="mt-0.5 sm:mt-1 md:mt-2 text-xs sm:text-xs md:text-sm leading-4 sm:leading-5 md:leading-6 text-slate-500">{subtitle}</p>
+            <p
+              className="mt-0.5 sm:mt-1 md:mt-2 text-xs sm:text-xs md:text-sm leading-4 sm:leading-5 md:leading-6"
+              style={{ color: "rgba(255,255,255,0.4)" }}
+            >
+              {subtitle}
+            </p>
           ) : null}
         </div>
         {actions ? <div className="self-start">{actions}</div> : null}
       </div>
-      <div className={`mt-4 md:mt-6 ${bodyClassName ?? ""}`}>{children}</div>
+      <div className={`relative mt-4 md:mt-6 ${bodyClassName ?? ""}`}>{children}</div>
     </section>
   );
 }
@@ -193,11 +243,24 @@ function MetricCard({
   value: string;
 }) {
   return (
-    <div className="flex h-full min-h-[100px] md:min-h-[120px] lg:min-h-[140px] flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 md:p-5 shadow-sm">
-      <p className="text-[8px] xsm:text-[9px] sm:text-[10px] md:text-[11px] font-semibold uppercase tracking-[0.15em] sm:tracking-[0.18em] md:tracking-[0.24em] text-slate-500">
+    <div
+      className="relative overflow-hidden flex h-full min-h-[100px] md:min-h-[120px] lg:min-h-[140px] flex-col justify-between rounded-2xl p-4 md:p-5"
+      style={CARD}
+    >
+      <div
+        className="pointer-events-none absolute bottom-0 right-0 h-16 w-16"
+        style={{ background: "radial-gradient(circle at bottom right, rgba(0,212,255,0.06) 0%, transparent 70%)" }}
+      />
+      <p
+        className="text-[8px] xsm:text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-[0.15em] sm:tracking-[0.18em] md:tracking-[0.24em]"
+        style={{ color: "#00d4ff" }}
+      >
         {label}
       </p>
-      <p className="mt-2 sm:mt-3 md:mt-4 lg:mt-6 text-base sm:text-lg md:text-xl lg:text-2xl font-semibold tracking-[-0.015em] sm:tracking-[-0.02em] md:tracking-[-0.025em] lg:tracking-[-0.03em] text-slate-950">
+      <p
+        className="mt-2 sm:mt-3 md:mt-4 lg:mt-6 text-base sm:text-lg md:text-xl lg:text-2xl font-bold tracking-tight"
+        style={GRADIENT_TEXT}
+      >
         {value}
       </p>
     </div>
@@ -219,11 +282,20 @@ function ActionButton({
 }) {
   return (
     <button
-      className={`inline-flex h-9 sm:h-10 md:h-10 items-center justify-center gap-2 rounded-xl sm:rounded-2xl px-3 sm:px-4 text-xs sm:text-sm font-semibold transition active:scale-95 ${
+      className="inline-flex h-9 sm:h-10 items-center justify-center gap-2 rounded-xl sm:rounded-2xl px-3 sm:px-4 text-xs sm:text-sm font-semibold transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+      style={
         primary
-          ? "bg-slate-950 text-white hover:bg-slate-800 disabled:hover:bg-slate-950"
-          : "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 disabled:hover:bg-white"
-      } disabled:cursor-not-allowed disabled:opacity-60`}
+          ? {
+              background: "linear-gradient(135deg,#7c3aed,#00d4ff)",
+              boxShadow: "0 0 20px rgba(124,58,237,0.3)",
+              color: "#fff",
+            }
+          : {
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              color: "rgba(255,255,255,0.7)",
+            }
+      }
       disabled={busy || disabled}
       onClick={onClick}
       type="button"
@@ -234,6 +306,7 @@ function ActionButton({
   );
 }
 
+/* ── Mind map helpers ────────────────────────────────────────────── */
 function cleanMindMapLabel(value: string) {
   return value.replace(/\s+/g, " ").replace(/[`"]/g, "").trim();
 }
@@ -319,7 +392,10 @@ function MindMapPreview({
 
   if (!derivedOutline.length) {
     return (
-      <pre className="min-h-[260px] whitespace-pre-wrap break-words rounded-2xl border border-slate-200 bg-slate-50 p-6 font-mono text-sm leading-relaxed text-slate-700">
+      <pre
+        className="min-h-[260px] whitespace-pre-wrap break-words rounded-2xl p-6 font-mono text-sm leading-relaxed"
+        style={{ ...SUBCARD, color: "rgba(255,255,255,0.55)" }}
+      >
         {mermaid || "No mind map generated yet."}
       </pre>
     );
@@ -328,7 +404,13 @@ function MindMapPreview({
   return (
     <div className="space-y-5">
       <div className="flex justify-center">
-        <div className="max-w-full rounded-full bg-slate-950 px-6 py-3 text-center text-sm font-semibold text-white shadow-sm">
+        <div
+          className="max-w-full rounded-full px-6 py-3 text-center text-sm font-bold text-white shadow-sm"
+          style={{
+            background: "linear-gradient(135deg,#7c3aed,#00d4ff)",
+            boxShadow: "0 0 24px rgba(124,58,237,0.3)",
+          }}
+        >
           {title}
         </div>
       </div>
@@ -337,12 +419,16 @@ function MindMapPreview({
         {derivedOutline.map((node, index) => (
           <div
             key={`${node.text ?? "branch"}-${index}`}
-            className="rounded-2xl border border-slate-200 bg-slate-50 p-6"
+            className="rounded-2xl p-6"
+            style={SUBCARD}
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
+            <p
+              className="text-xs font-bold uppercase tracking-[0.24em]"
+              style={{ color: "#00d4ff" }}
+            >
               Branch {index + 1}
             </p>
-            <h4 className="mt-3 text-lg font-semibold text-slate-950">
+            <h4 className="mt-3 text-lg font-semibold text-white">
               {node.text || "Untitled branch"}
             </h4>
 
@@ -351,17 +437,25 @@ function MindMapPreview({
                 {node.children.map((child, childIndex) => (
                   <div
                     key={`${child.text ?? "child"}-${childIndex}`}
-                    className="rounded-2xl border border-white bg-white/85 p-4"
+                    className="rounded-2xl p-4"
+                    style={{
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.07)",
+                    }}
                   >
-                    <p className="text-sm font-semibold leading-6 text-slate-900">
+                    <p className="text-sm font-semibold leading-6 text-white">
                       {child.text || "Supporting point"}
                     </p>
                     {child.children?.length ? (
-                      <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                      <ul
+                        className="mt-3 space-y-2 text-sm leading-6"
+                        style={{ color: "rgba(255,255,255,0.55)" }}
+                      >
                         {child.children.map((leaf, leafIndex) => (
                           <li
                             key={`${leaf.text ?? "leaf"}-${leafIndex}`}
-                            className="rounded-2xl bg-slate-50 px-3 py-2"
+                            className="rounded-xl px-3 py-2"
+                            style={{ background: "rgba(255,255,255,0.03)" }}
                           >
                             {leaf.text || "Detail"}
                           </li>
@@ -372,7 +466,10 @@ function MindMapPreview({
                 ))}
               </div>
             ) : (
-              <p className="mt-4 text-sm leading-6 text-slate-500">
+              <p
+                className="mt-4 text-sm leading-6"
+                style={{ color: "rgba(255,255,255,0.35)" }}
+              >
                 Add more detail by regenerating the mind map for this session.
               </p>
             )}
@@ -381,11 +478,24 @@ function MindMapPreview({
       </div>
 
       {mermaid ? (
-        <details className="rounded-2xl border border-slate-200 bg-white p-5">
-          <summary className="cursor-pointer text-sm font-semibold text-slate-700">
+        <details
+          className="rounded-2xl p-5"
+          style={SUBCARD}
+        >
+          <summary
+            className="cursor-pointer text-sm font-semibold"
+            style={{ color: "rgba(255,255,255,0.65)" }}
+          >
             Mermaid source
           </summary>
-          <pre className="mt-4 whitespace-pre-wrap break-words rounded-2xl border border-slate-200 bg-slate-50 p-4 font-mono text-xs leading-6 text-slate-600">
+          <pre
+            className="mt-4 whitespace-pre-wrap break-words rounded-2xl p-4 font-mono text-xs leading-6"
+            style={{
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              color: "rgba(255,255,255,0.55)",
+            }}
+          >
             {mermaid}
           </pre>
         </details>
@@ -394,6 +504,7 @@ function MindMapPreview({
   );
 }
 
+/* ── Main page component ─────────────────────────────────────────── */
 export function StudioPageClient() {
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -724,7 +835,7 @@ export function StudioPageClient() {
     try {
       const reader = new FileReader();
       reader.onload = async (event) => {
-        const imageData = (event.target?.result as string).split(",")[1]; // Remove data:image/png;base64, prefix
+        const imageData = (event.target?.result as string).split(",")[1];
         if (!imageData) {
           setError("Invalid image file.");
           return;
@@ -738,7 +849,7 @@ export function StudioPageClient() {
               file_type: file.type,
             }),
           });
-          
+
           const payload = await readJson<{
             success: boolean;
             extracted_text?: string;
@@ -746,7 +857,7 @@ export function StudioPageClient() {
             error?: string;
             setup_guide?: Record<string, unknown>;
           }>(response);
-          
+
           if (!payload.success) {
             const errorMsg = payload.error || "OCR processing failed";
             if (payload.setup_guide) {
@@ -761,7 +872,7 @@ export function StudioPageClient() {
             setBusyKey("");
             return;
           }
-          
+
           const existingNotes = detail.uploaded_notes ?? [];
           existingNotes.push({
             timestamp: new Date().toISOString(),
@@ -795,586 +906,538 @@ export function StudioPageClient() {
 
   return (
     <div className="grid gap-4 md:gap-8 overflow-x-hidden pb-6 md:pb-8">
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
-        <p className="text-[10px] md:text-sm font-semibold uppercase tracking-[0.2em] md:tracking-[0.24em] text-sky-700">
-          Studio
-        </p>
-        <h2 className="mt-2 text-xl md:text-3xl font-semibold tracking-[-0.03em] md:tracking-[-0.04em] text-slate-950">
-          Native AI study workspace
-        </h2>
-        <p className="mt-2 md:mt-3 max-w-3xl text-xs md:text-sm leading-5 md:leading-6 text-slate-600">
-          The Studio route now runs as real Next.js UI with session browsing, AI
-          generation, transcript chat, translation, and YouTube import wired to
-          your existing backend.
-        </p>
+      {/* ── Page header ── */}
+      <section
+        className="relative overflow-hidden rounded-3xl p-7 md:p-10"
+        style={{
+          background: "rgba(255,255,255,0.025)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          border: "1px solid rgba(124,58,237,0.18)",
+          boxShadow: "0 0 60px rgba(124,58,237,0.07), 0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)",
+        }}
+      >
+        {/* Ambient inner glows */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ background: "radial-gradient(ellipse at top left, rgba(124,58,237,0.12) 0%, transparent 55%)" }}
+        />
+        <div
+          className="pointer-events-none absolute bottom-0 right-0 h-48 w-48"
+          style={{ background: "radial-gradient(circle at bottom right, rgba(0,212,255,0.08) 0%, transparent 60%)" }}
+        />
+
+        <div className="relative">
+          <div
+            className="mb-4 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest"
+            style={{
+              background: "rgba(167,139,250,0.08)",
+              border: "1px solid rgba(167,139,250,0.22)",
+              color: "#c4b5fd",
+            }}
+          >
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ background: "#a78bfa", boxShadow: "0 0 6px #a78bfa" }}
+            />
+            AI Studio · Study Workspace
+          </div>
+          <h2
+            className="text-2xl md:text-4xl font-bold leading-tight tracking-tight"
+            style={GRADIENT_TEXT}
+          >
+            Native AI study
+            <br />
+            workspace
+          </h2>
+          <p
+            className="mt-3 max-w-2xl text-sm md:text-base leading-7"
+            style={{ color: "rgba(255,255,255,0.45)" }}
+          >
+            Browse sessions, generate AI artifacts, chat with your transcript,
+            translate to any language, and import from YouTube — all wired to your
+            existing backend.
+          </p>
+        </div>
       </section>
 
+      {/* ── Error banner ── */}
       {error ? (
-        <div className="rounded-[20px] md:rounded-[24px] border border-rose-200 bg-rose-50 px-4 md:px-6 py-3 md:py-4 text-xs md:text-sm leading-5 md:leading-6 text-rose-700">
+        <div
+          className="rounded-2xl px-4 md:px-6 py-3 md:py-4 text-xs md:text-sm leading-5 md:leading-6"
+          style={{
+            background: "rgba(239,68,68,0.08)",
+            border: "1px solid rgba(239,68,68,0.2)",
+            color: "#fca5a5",
+          }}
+        >
           {error}
         </div>
       ) : null}
 
-      <div className="grid items-start gap-3 sm:gap-4 md:gap-6 lg:gap-8 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="space-y-3 sm:space-y-4 md:space-y-5 lg:sticky lg:top-6">
-          <StudioCard
-            subtitle={youtubeStatus}
-            title="YouTube import"
-            actions={
-              <ActionButton
-                busy={busyKey === "youtube"}
-                onClick={importYouTubeSession}
-                primary
-              >
-                <Video className="h-4 w-4" />
-                Import
-              </ActionButton>
-            }
-          >
-            <div className="space-y-2 sm:space-y-3">
-              <select
-                className="h-10 sm:h-11 w-full rounded-lg sm:rounded-2xl border border-slate-200 bg-slate-50 px-3 sm:px-4 text-xs sm:text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                onChange={(event) => setYoutubeBrowser(event.target.value)}
-                value={youtubeBrowser}
-              >
-                <option value="">No sign-in</option>
-                <option disabled={isHostedEnvironment} value="chrome">
-                  Use Chrome cookies{isHostedEnvironment ? " (local only)" : ""}
-                </option>
-                <option disabled={isHostedEnvironment} value="edge">
-                  Use Edge cookies{isHostedEnvironment ? " (local only)" : ""}
-                </option>
-                <option disabled={isHostedEnvironment} value="firefox">
-                  Use Firefox cookies{isHostedEnvironment ? " (local only)" : ""}
-                </option>
-                <option disabled={isHostedEnvironment} value="brave">
-                  Use Brave cookies{isHostedEnvironment ? " (local only)" : ""}
-                </option>
-                <option disabled={isHostedEnvironment} value="safari">
-                  Use Safari cookies{isHostedEnvironment ? " (local only)" : ""}
-                </option>
-                <option value="paste">Paste cookies</option>
-              </select>
-              {isHostedEnvironment ? (
-                <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
-                  Browser-cookie import works only on local development machines.
-                  On the deployed app, use <span className="font-semibold">Paste cookies</span> or{" "}
-                  <span className="font-semibold">No sign-in</span>.
-                </p>
-              ) : null}
-              {youtubeBrowser === "paste" ? (
-                <textarea
-                  className="min-h-[110px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                  onChange={(event) => setYoutubeCookies(event.target.value)}
-                  placeholder="Paste Netscape-format cookies"
-                  value={youtubeCookies}
-                />
-              ) : null}
-              <input
-                className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                onChange={(event) => setYoutubeUrl(event.target.value)}
-                placeholder="Paste a YouTube URL"
-                value={youtubeUrl}
+      {/* ══════════════════════════════════════════════════════════════════
+          ROW 1 — YouTube Import  |  Sessions list
+      ══════════════════════════════════════════════════════════════════ */}
+      <section className="grid gap-5 md:grid-cols-2">
+        {/* YouTube import */}
+        <StudioCard
+          subtitle={youtubeStatus}
+          title="YouTube import"
+          actions={
+            <ActionButton busy={busyKey === "youtube"} onClick={importYouTubeSession} primary>
+              <Video className="h-4 w-4" />
+              Import
+            </ActionButton>
+          }
+        >
+          <div className="space-y-3">
+            <select
+              className="h-11 w-full rounded-2xl px-4 text-sm outline-none transition"
+              style={SELECT_STYLE}
+              onChange={(e) => setYoutubeBrowser(e.target.value)}
+              value={youtubeBrowser}
+            >
+              <option value="">No sign-in</option>
+              <option disabled={isHostedEnvironment} value="chrome">Use Chrome cookies{isHostedEnvironment ? " (local only)" : ""}</option>
+              <option disabled={isHostedEnvironment} value="edge">Use Edge cookies{isHostedEnvironment ? " (local only)" : ""}</option>
+              <option disabled={isHostedEnvironment} value="firefox">Use Firefox cookies{isHostedEnvironment ? " (local only)" : ""}</option>
+              <option disabled={isHostedEnvironment} value="brave">Use Brave cookies{isHostedEnvironment ? " (local only)" : ""}</option>
+              <option disabled={isHostedEnvironment} value="safari">Use Safari cookies{isHostedEnvironment ? " (local only)" : ""}</option>
+              <option value="paste">Paste cookies</option>
+            </select>
+            {isHostedEnvironment ? (
+              <p className="rounded-2xl px-4 py-3 text-sm leading-6"
+                style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)", color: "#fde68a" }}>
+                Browser-cookie import works only on local machines. On the deployed app, use{" "}
+                <span className="font-semibold">Paste cookies</span> or <span className="font-semibold">No sign-in</span>.
+              </p>
+            ) : null}
+            {youtubeBrowser === "paste" ? (
+              <textarea
+                className="min-h-[90px] w-full rounded-2xl px-4 py-3 text-sm outline-none transition placeholder:text-white/25"
+                style={INPUT_STYLE}
+                onChange={(e) => setYoutubeCookies(e.target.value)}
+                placeholder="Paste Netscape-format cookies"
+                value={youtubeCookies}
               />
+            ) : null}
+            <input
+              className="h-11 w-full rounded-2xl px-4 text-sm outline-none transition placeholder:text-white/25"
+              style={INPUT_STYLE}
+              onChange={(e) => setYoutubeUrl(e.target.value)}
+              placeholder="Paste a YouTube URL"
+              value={youtubeUrl}
+            />
+          </div>
+        </StudioCard>
+
+        {/* Sessions list */}
+        <StudioCard
+          title="Sessions"
+          actions={
+            <button
+              className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition hover:opacity-80"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}
+              onClick={() => void loadSessions()}
+              type="button"
+            >
+              <RefreshCcw className="h-3.5 w-3.5" />
+              Refresh
+            </button>
+          }
+        >
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "rgba(255,255,255,0.3)" }} />
+            <input
+              className="h-11 w-full rounded-2xl pl-11 pr-4 text-sm outline-none transition placeholder:text-white/25"
+              style={INPUT_STYLE}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by title or transcript"
+              value={search}
+            />
+          </label>
+          <div className="mt-4 grid gap-2 max-h-72 overflow-y-auto pr-1 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
+            {filteredSessions.length ? (
+              filteredSessions.map((session) => (
+                <button
+                  key={session.session_id}
+                  className="w-full rounded-2xl p-4 text-left transition"
+                  style={
+                    session.session_id === selectedId
+                      ? { background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)" }
+                      : { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }
+                  }
+                  onClick={() => void openSession(session.session_id)}
+                  type="button"
+                >
+                  <p className="text-sm font-semibold text-white truncate">{session.title || "Untitled session"}</p>
+                  <p className="mt-1 text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>{getSessionDateLabel(session.started_at)}</p>
+                  <p className="mt-1 text-xs font-medium" style={{ color: "rgba(255,255,255,0.55)" }}>
+                    {getModeLabel(session.mode)} · {(session.word_count ?? 0).toLocaleString()} words
+                  </p>
+                </button>
+              ))
+            ) : (
+              <div className="col-span-full rounded-2xl px-4 py-5 text-sm" style={{ ...SUBCARD, color: "rgba(255,255,255,0.35)" }}>
+                No sessions match this search yet.
+              </div>
+            )}
+          </div>
+        </StudioCard>
+      </section>
+
+      {/* ── No session selected placeholder ── */}
+      {!detail ? (
+        <div className="rounded-3xl p-10 text-center text-sm leading-6" style={{ ...CARD, color: "rgba(255,255,255,0.4)" }}>
+          Select a session above to unlock translations, AI artifacts, and transcript chat.
+        </div>
+      ) : (
+        <>
+          {/* ══════════════════════════════════════════════════════════════════
+              ROW 2 — Session info  |  4 metric cards
+          ══════════════════════════════════════════════════════════════════ */}
+          <section className="grid gap-5 md:grid-cols-2">
+            <StudioCard
+              subtitle={
+                detail.source_type === "youtube"
+                  ? `Imported from YouTube${detail.source_channel ? ` via ${detail.source_channel}` : ""}.`
+                  : "Transcript-derived study workspace for this saved session."
+              }
+              title={detail.title || "Untitled session"}
+            >
+              <div className="flex flex-wrap gap-2 text-xs">
+                {[
+                  { text: getSessionDateLabel(detail.started_at), color: "rgba(255,255,255,0.5)" },
+                  { text: getModeLabel(detail.mode), color: "#a78bfa" },
+                  { text: getLanguageLabel(detail.language), color: "#00d4ff" },
+                ].map(({ text, color }) => (
+                  <span key={text} className="rounded-full px-3 py-1"
+                    style={{ background: `${color}12`, color, border: `1px solid ${color}20` }}>
+                    {text}
+                  </span>
+                ))}
+                {detail.custom_vocabulary?.length ? (
+                  <span className="rounded-full px-3 py-1"
+                    style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    {detail.custom_vocabulary.length} custom terms
+                  </span>
+                ) : null}
+              </div>
+            </StudioCard>
+
+            <div className="grid grid-cols-2 gap-4">
+              <MetricCard label="Words" value={(detail.word_count ?? 0).toLocaleString()} />
+              <MetricCard label="Sentences" value={(detail.sentence_count ?? 0).toLocaleString()} />
+              <MetricCard label="Speakers" value={(detail.speakers?.length ?? 0).toLocaleString()} />
+              <MetricCard label="Avg sentiment" value={(detail.sentiment_summary?.average_score ?? 0).toFixed(2)} />
             </div>
-          </StudioCard>
-          <StudioCard
-            title="Sessions"
-            actions={
-              <button
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950"
-                onClick={() => void loadSessions()}
-                type="button"
-              >
-                <RefreshCcw className="h-3.5 w-3.5" />
-                Refresh
-              </button>
-            }
-          >
-            <label className="relative block">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search by title or transcript"
-                value={search}
-              />
-            </label>
-            <div className="mt-4 max-h-[calc(100vh-24rem)] space-y-3 overflow-y-auto pr-1">
-              {filteredSessions.length ? (
-                filteredSessions.map((session) => (
-                  <button
-                    key={session.session_id}
-                    className={`w-full rounded-3xl border p-4 text-left transition ${
-                      session.session_id === selectedId
-                        ? "border-sky-200 bg-sky-50"
-                        : "border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white"
-                    }`}
-                    onClick={() => void openSession(session.session_id)}
-                    type="button"
-                  >
-                    <p className="text-sm font-semibold text-slate-950">
-                      {session.title || "Untitled session"}
+          </section>
+
+          {/* ══════════════════════════════════════════════════════════════════
+              ROW 3 — Summary & Notes  |  Speakers & Sentiment
+          ══════════════════════════════════════════════════════════════════ */}
+          <section className="grid gap-5 md:grid-cols-2">
+            <StudioCard bodyClassName="h-full" className="h-full" title="Summary and notes">
+              <pre className="h-full min-h-[300px] whitespace-pre-wrap break-words rounded-3xl p-5 font-mono text-sm leading-7"
+                style={{ ...SUBCARD, color: "rgba(255,255,255,0.65)" }}>
+                {[
+                  detail.summary ? `SUMMARY\n${detail.summary}` : "",
+                  detail.notes ? `NOTES\n${detail.notes}` : "",
+                  `TRANSCRIPT PREVIEW\n${(transcript || "No transcript stored yet.").slice(0, 1200)}${transcript.length > 1200 ? "\n\n..." : ""}`,
+                ].filter(Boolean).join("\n\n")}
+              </pre>
+            </StudioCard>
+
+            <StudioCard bodyClassName="h-full" className="h-full" title="Speakers and sentiment">
+              <div className="flex h-full min-h-[300px] flex-col gap-4">
+                {detail.speakers?.length ? (
+                  <div className="max-h-[180px] space-y-2 overflow-y-auto pr-1">
+                    {detail.speakers.map((speaker, index) => (
+                      <div key={`${speaker.speaker ?? "speaker"}-${index}`}
+                        className="flex gap-3 rounded-2xl p-3" style={SUBCARD}>
+                        <span className="flex h-fit min-w-[80px] items-center justify-center rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em]"
+                          style={{ background: "rgba(0,212,255,0.1)", color: "#00d4ff" }}>
+                          {speaker.speaker || "Speaker"}
+                        </span>
+                        <p className="break-words text-sm leading-6" style={{ color: "rgba(255,255,255,0.65)" }}>
+                          {speaker.text || ""}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl p-4 text-sm" style={{ ...SUBCARD, color: "rgba(255,255,255,0.35)" }}>
+                    Speaker detection is not available for this session yet.
+                  </div>
+                )}
+                <div className="mt-auto grid grid-cols-3 gap-3">
+                  {[
+                    { label: "Overall", value: (detail.sentiment_summary?.overall ?? "neutral").toUpperCase() },
+                    { label: "Pos/Neu/Neg", value: `${detail.sentiment_summary?.counts?.positive ?? 0}/${detail.sentiment_summary?.counts?.neutral ?? 0}/${detail.sentiment_summary?.counts?.negative ?? 0}` },
+                    { label: "Timeline", value: `${(detail.sentiment_timeline?.length ?? 0).toLocaleString()} pts` },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="flex min-h-[100px] flex-col justify-between rounded-2xl p-4" style={SUBCARD}>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: "rgba(255,255,255,0.4)" }}>{label}</p>
+                      <p className="text-base font-bold text-white">{value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </StudioCard>
+          </section>
+
+          {/* ══════════════════════════════════════════════════════════════════
+              ROW 4 — Translation  |  Rich Notes
+          ══════════════════════════════════════════════════════════════════ */}
+          <section className="grid gap-5 md:grid-cols-2">
+            <StudioCard bodyClassName="h-full" className="h-full" title="Multi-language output"
+              subtitle="Generate and cache translated transcript output on demand."
+              actions={
+                <div className="flex flex-wrap items-center gap-3">
+                  <select className="h-10 rounded-2xl px-3 text-sm outline-none transition"
+                    style={SELECT_STYLE}
+                    onChange={(e) => setTranslationTarget(e.target.value)}
+                    value={translationTarget}>
+                    {translationOptions.map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                  <ActionButton busy={busyKey === "translate"} onClick={translateCurrent}>
+                    <Languages className="h-4 w-4" />
+                    Generate
+                  </ActionButton>
+                </div>
+              }>
+              <pre className="min-h-[220px] whitespace-pre-wrap break-words rounded-3xl p-5 font-mono text-sm leading-7"
+                style={{ ...SUBCARD, color: "rgba(255,255,255,0.65)" }}>
+                {translationValue || 'Choose a language and click "Generate".'}
+              </pre>
+            </StudioCard>
+
+            <StudioCard bodyClassName="h-full" className="h-full" title="Rich notes"
+              subtitle="Extract detailed study notes from the selected session."
+              actions={
+                <div className="flex flex-wrap gap-3">
+                  <ActionButton busy={busyKey === "rich_notes"} onClick={() => void generateArtifact("rich_notes")}>
+                    <FileText className="h-4 w-4" />
+                    Generate
+                  </ActionButton>
+                  <ActionButton onClick={() => void copyRichNotes()}>
+                    <Copy className="h-4 w-4" />
+                    Copy
+                  </ActionButton>
+                </div>
+              }>
+              <pre className="min-h-[220px] whitespace-pre-wrap break-words rounded-3xl p-5 font-mono text-sm leading-7"
+                style={{ ...SUBCARD, color: "rgba(255,255,255,0.65)" }}>
+                {detail.rich_notes || "No rich notes generated yet."}
+              </pre>
+            </StudioCard>
+          </section>
+
+          {/* ══════════════════════════════════════════════════════════════════
+              ROW 5 — Flashcards  |  Quiz
+          ══════════════════════════════════════════════════════════════════ */}
+          <section className="grid gap-5 md:grid-cols-2">
+            <StudioCard bodyClassName="h-full" className="h-full" title="Flashcards"
+              subtitle="Create revision cards grounded in the transcript."
+              actions={
+                <div className="flex flex-wrap gap-2">
+                  <ActionButton busy={busyKey === "flashcards"} onClick={() => void generateArtifact("flashcards")}>
+                    <GraduationCap className="h-4 w-4" />
+                    Generate
+                  </ActionButton>
+                  <ActionButton disabled={flashcardIndex === 0 || !flashcards.length}
+                    onClick={() => setFlashcardIndex((c) => Math.max(c - 1, 0))}>
+                    <ChevronLeft className="h-4 w-4" />
+                    Prev
+                  </ActionButton>
+                  <ActionButton disabled={!flashcards.length || flashcardIndex >= flashcards.length - 1}
+                    onClick={() => setFlashcardIndex((c) => Math.min(c + 1, Math.max(flashcards.length - 1, 0)))}>
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </ActionButton>
+                </div>
+              }>
+              {currentFlashcard ? (
+                <div className="h-full rounded-3xl p-5" style={SUBCARD}>
+                  <p className="text-xs font-bold uppercase tracking-[0.24em]" style={{ color: "#00d4ff" }}>
+                    Card {flashcardIndex + 1} of {flashcards.length}
+                  </p>
+                  <h4 className="mt-4 text-lg font-semibold text-white">{currentFlashcard.question || "Question"}</h4>
+                  <p className="mt-4 break-words text-sm leading-7" style={{ color: "rgba(255,255,255,0.65)" }}>
+                    <span className="font-semibold text-white">Answer:</span>{" "}{currentFlashcard.answer || ""}
+                  </p>
+                  {currentFlashcard.explanation ? (
+                    <p className="mt-4 break-words text-sm leading-7" style={{ color: "rgba(255,255,255,0.4)" }}>
+                      {currentFlashcard.explanation}
                     </p>
-                    <p className="mt-2 text-xs leading-5 text-slate-500">
-                      {getSessionDateLabel(session.started_at)}
-                    </p>
-                    <p className="mt-2 text-xs font-medium text-slate-600">
-                      {getModeLabel(session.mode)} ·{" "}
-                      {(session.word_count ?? 0).toLocaleString()} words
-                    </p>
-                  </button>
-                ))
+                  ) : null}
+                </div>
               ) : (
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
-                  No sessions match this search yet.
+                <div className="rounded-3xl p-5 text-sm" style={{ ...SUBCARD, color: "rgba(255,255,255,0.35)" }}>
+                  No flashcards yet.
                 </div>
               )}
+            </StudioCard>
+
+            <StudioCard bodyClassName="h-full" className="h-full" title="Quiz"
+              subtitle="Build a transcript-grounded multiple-choice quiz."
+              actions={
+                <div className="flex flex-wrap gap-2">
+                  <ActionButton busy={busyKey === "quiz"} onClick={() => void generateArtifact("quiz")}>
+                    <Sparkles className="h-4 w-4" />
+                    Generate
+                  </ActionButton>
+                  <ActionButton disabled={quizIndex === 0 || !quizQuestions.length}
+                    onClick={() => setQuizIndex((c) => Math.max(c - 1, 0))}>
+                    <ChevronLeft className="h-4 w-4" />
+                    Prev
+                  </ActionButton>
+                  <ActionButton disabled={!quizQuestions.length || quizIndex >= quizQuestions.length - 1}
+                    onClick={() => setQuizIndex((c) => Math.min(c + 1, Math.max(quizQuestions.length - 1, 0)))}>
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </ActionButton>
+                </div>
+              }>
+              {currentQuiz ? (
+                <div className="h-full rounded-3xl p-5" style={SUBCARD}>
+                  <p className="text-xs font-bold uppercase tracking-[0.24em]" style={{ color: "#a78bfa" }}>
+                    Question {quizIndex + 1} of {quizQuestions.length}
+                  </p>
+                  <h4 className="mt-4 text-lg font-semibold text-white">{currentQuiz.question || "Quiz question"}</h4>
+                  <div className="mt-4 space-y-2">
+                    {(currentQuiz.options ?? []).map((option, index) => (
+                      <div key={`${option}-${index}`} className="rounded-2xl px-4 py-3 text-sm"
+                        style={index === currentQuiz.answer_index
+                          ? { background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.25)", color: "#34d399" }
+                          : { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.65)" }}>
+                        {String.fromCharCode(65 + index)}. {option}
+                      </div>
+                    ))}
+                  </div>
+                  {currentQuiz.explanation ? (
+                    <p className="mt-4 break-words text-sm leading-7" style={{ color: "rgba(255,255,255,0.4)" }}>
+                      {currentQuiz.explanation}
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="rounded-3xl p-5 text-sm" style={{ ...SUBCARD, color: "rgba(255,255,255,0.35)" }}>
+                  No quiz generated yet.
+                </div>
+              )}
+            </StudioCard>
+          </section>
+
+          {/* ══════════════════════════════════════════════════════════════════
+              ROW 6 — Podcast  |  Mind Map
+          ══════════════════════════════════════════════════════════════════ */}
+          <section className="grid gap-5 md:grid-cols-2">
+            <StudioCard bodyClassName="h-full" className="h-full" title="Podcast"
+              subtitle="Generate a compact spoken recap from the selected transcript."
+              actions={
+                <div className="flex flex-wrap gap-3">
+                  <ActionButton busy={busyKey === "podcast"} onClick={() => void generateArtifact("podcast")}>
+                    <Mic2 className="h-4 w-4" />
+                    Generate
+                  </ActionButton>
+                  <ActionButton onClick={playPodcast}>
+                    <PlayCircle className="h-4 w-4" />
+                    Play script
+                  </ActionButton>
+                </div>
+              }>
+              <div className="rounded-3xl p-4" style={SUBCARD}>
+                <div className="grid gap-3">
+                  {detail.podcast?.script?.length ? (
+                    detail.podcast.script.slice(0, 6).map((line, index) => (
+                      <div key={`${line.speaker ?? "speaker"}-${index}`}
+                        className="rounded-2xl p-4 text-sm leading-7"
+                        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.65)" }}>
+                        <span className="font-semibold text-white">{line.speaker || "Host"}:</span>{" "}{line.line || ""}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm" style={{ color: "rgba(255,255,255,0.35)" }}>No podcast script generated yet.</p>
+                  )}
+                </div>
+              </div>
+            </StudioCard>
+
+            <StudioCard title="Mind map"
+              subtitle="Generate a structured visual map of the session."
+              actions={
+                <div className="flex flex-wrap gap-3">
+                  <ActionButton busy={busyKey === "mindmap"} onClick={() => void generateArtifact("mindmap")}>
+                    <Network className="h-4 w-4" />
+                    Generate
+                  </ActionButton>
+                  <ActionButton onClick={downloadMindMap}>
+                    <Download className="h-4 w-4" />
+                    Download
+                  </ActionButton>
+                </div>
+              }>
+              <MindMapPreview
+                mermaid={detail.mind_map?.mermaid}
+                outline={detail.mind_map?.outline}
+                title={detail.mind_map?.title || detail.title || "Mind Map"}
+              />
+            </StudioCard>
+          </section>
+
+          {/* ══════════════════════════════════════════════════════════════════
+              ROW 7 — Transcript Chat  (full width)
+          ══════════════════════════════════════════════════════════════════ */}
+          <StudioCard bodyClassName="h-full" title="Transcript chat"
+            subtitle="Ask questions against the selected transcript and keep the conversation grounded in session context.">
+            <div className="space-y-4">
+              <div className="max-h-[360px] space-y-3 overflow-y-auto rounded-3xl p-5" style={SUBCARD}>
+                {chatHistory.length ? (
+                  chatHistory.map((message, index) => (
+                    <div key={`${message.role}-${index}`} className="rounded-2xl px-4 py-3 text-sm leading-7"
+                      style={message.role === "user"
+                        ? { background: "rgba(0,212,255,0.07)", border: "1px solid rgba(0,212,255,0.18)" }
+                        : { background: "rgba(167,139,250,0.07)", border: "1px solid rgba(167,139,250,0.18)" }}>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.2em]"
+                        style={{ color: message.role === "user" ? "#00d4ff" : "#a78bfa" }}>
+                        {message.role}
+                      </p>
+                      <p className="mt-2 whitespace-pre-wrap" style={{ color: "rgba(255,255,255,0.75)" }}>
+                        {message.content}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl px-4 py-3 text-sm" style={{ ...SUBCARD, color: "rgba(255,255,255,0.35)" }}>
+                    Ask anything about this transcript and the backend will answer using the selected session context.
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <textarea
+                  className="min-h-[110px] flex-1 rounded-3xl px-4 py-3 text-sm outline-none transition placeholder:text-white/25"
+                  style={INPUT_STYLE}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Ask about decisions, action items, concepts, or follow-ups."
+                  value={chatInput}
+                />
+                <div className="sm:w-[180px] sm:self-end">
+                  <ActionButton busy={busyKey === "chat"} onClick={() => void sendChat()} primary>
+                    <MessageSquareText className="h-4 w-4" />
+                    Ask Studio
+                  </ActionButton>
+                </div>
+              </div>
             </div>
           </StudioCard>
-        </aside>
 
-        <div className="min-w-0 space-y-8">
-          {!detail ? (
-            <div className="rounded-[30px] border border-white/70 bg-white/90 p-10 text-center text-sm leading-6 text-slate-500 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur">
-              Select a session to unlock translations, AI artifacts, and transcript chat.
-            </div>
-          ) : (
-            <>
-              <section className="grid items-stretch gap-4 md:gap-5 md:grid-cols-[minmax(0,1fr)_minmax(250px,1fr)] lg:grid-cols-[minmax(0,1.15fr)_minmax(300px,0.85fr)]">
-                <StudioCard
-                  subtitle={
-                    detail.source_type === "youtube"
-                      ? `Imported from YouTube${detail.source_channel ? ` via ${detail.source_channel}` : ""}.`
-                      : "Transcript-derived study workspace for this saved session."
-                  }
-                  title={detail.title || "Untitled session"}
-                >
-                  <div className="flex flex-wrap gap-2 text-xs text-slate-500">
-                    <span className="rounded-full bg-slate-100 px-3 py-1">
-                      {getSessionDateLabel(detail.started_at)}
-                    </span>
-                    <span className="rounded-full bg-slate-100 px-3 py-1">
-                      {getModeLabel(detail.mode)}
-                    </span>
-                    <span className="rounded-full bg-slate-100 px-3 py-1">
-                      {getLanguageLabel(detail.language)}
-                    </span>
-                    {detail.custom_vocabulary?.length ? (
-                      <span className="rounded-full bg-slate-100 px-3 py-1">
-                        {detail.custom_vocabulary.length} custom terms
-                      </span>
-                    ) : null}
-                  </div>
-                </StudioCard>
-
-                <div className="grid auto-rows-fr gap-4 sm:grid-cols-2">
-                  <MetricCard
-                    label="Words"
-                    value={(detail.word_count ?? 0).toLocaleString()}
-                  />
-                  <MetricCard
-                    label="Sentences"
-                    value={(detail.sentence_count ?? 0).toLocaleString()}
-                  />
-                  <MetricCard
-                    label="Speakers"
-                    value={(detail.speakers?.length ?? 0).toLocaleString()}
-                  />
-                  <MetricCard
-                    label="Avg sentiment"
-                    value={(detail.sentiment_summary?.average_score ?? 0).toFixed(2)}
-                  />
-                </div>
-              </section>
-
-              <section className="grid items-stretch gap-4 md:gap-5 md:grid-cols-[minmax(0,1fr)_minmax(280px,1fr)] lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.92fr)]">
-                <StudioCard
-                  bodyClassName="h-full"
-                  className="h-full"
-                  title="Summary and notes"
-                >
-                  <pre className="h-full min-h-[340px] whitespace-pre-wrap break-words rounded-3xl border border-slate-200 bg-slate-50 p-5 font-mono text-sm leading-7 text-slate-700">
-                    {[
-                      detail.summary ? `SUMMARY\n${detail.summary}` : "",
-                      detail.notes ? `NOTES\n${detail.notes}` : "",
-                      `TRANSCRIPT PREVIEW\n${(transcript || "No transcript stored yet.").slice(0, 1800)}${transcript.length > 1800 ? "\n\n..." : ""}`,
-                    ]
-                      .filter(Boolean)
-                      .join("\n\n")}
-                  </pre>
-                </StudioCard>
-
-                <StudioCard
-                  bodyClassName="h-full"
-                  className="h-full"
-                  title="Speakers and sentiment"
-                >
-                  <div className="flex h-full min-h-[340px] flex-col gap-4">
-                    {detail.speakers?.length ? (
-                      <div className="max-h-[200px] space-y-3 overflow-y-auto pr-1">
-                        {detail.speakers.map((speaker, index) => (
-                        <div
-                          key={`${speaker.speaker ?? "speaker"}-${index}`}
-                          className="flex gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4"
-                        >
-                          <span className="flex h-fit min-w-[84px] items-center justify-center rounded-full bg-sky-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-700">
-                            {speaker.speaker || "Speaker"}
-                          </span>
-                          <p className="break-words text-sm leading-7 text-slate-700">
-                            {speaker.text || ""}
-                          </p>
-                        </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                        Speaker detection is not available for this session yet.
-                      </div>
-                    )}
-                    <div className="mt-auto grid auto-rows-fr gap-2 md:gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
-                      <div className="flex min-h-[120px] flex-col justify-between rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                          Overall
-                        </p>
-                        <p className="text-lg font-semibold text-slate-950">
-                          {(detail.sentiment_summary?.overall ?? "neutral").toUpperCase()}
-                        </p>
-                      </div>
-                      <div className="flex min-h-[120px] flex-col justify-between rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                          Positive / Neutral / Negative
-                        </p>
-                        <p className="text-lg font-semibold text-slate-950">
-                          {(detail.sentiment_summary?.counts?.positive ?? 0)} /{" "}
-                          {(detail.sentiment_summary?.counts?.neutral ?? 0)} /{" "}
-                          {(detail.sentiment_summary?.counts?.negative ?? 0)}
-                        </p>
-                      </div>
-                      <div className="flex min-h-[120px] flex-col justify-between rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                          Timeline
-                        </p>
-                        <p className="text-lg font-semibold text-slate-950">
-                          {(detail.sentiment_timeline?.length ?? 0).toLocaleString()} points
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </StudioCard>
-              </section>
-
-              <StudioCard
-                bodyClassName="h-full"
-                className="h-full"
-                title="Multi-language output"
-                subtitle="Generate and cache translated transcript output on demand."
-                actions={
-                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-                    <select
-                      className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-                      onChange={(event) => setTranslationTarget(event.target.value)}
-                      value={translationTarget}
-                    >
-                      {translationOptions.map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                    <ActionButton
-                      busy={busyKey === "translate"}
-                      onClick={translateCurrent}
-                    >
-                      <Languages className="h-4 w-4" />
-                      Generate
-                    </ActionButton>
-                  </div>
-                }
-              >
-                <pre className="min-h-[220px] whitespace-pre-wrap break-words rounded-3xl border border-slate-200 bg-slate-50 p-5 font-mono text-sm leading-7 text-slate-700">
-                  {translationValue || 'Choose a language and click "Generate".'}
-                </pre>
-              </StudioCard>
-              <StudioCard
-                bodyClassName="h-full"
-                className="h-full"
-                title="Rich notes"
-                subtitle="Extract detailed study notes from the selected session."
-                actions={
-                  <div className="flex flex-wrap gap-3">
-                    <ActionButton
-                      busy={busyKey === "rich_notes"}
-                      onClick={() => void generateArtifact("rich_notes")}
-                    >
-                      <FileText className="h-4 w-4" />
-                      Generate
-                    </ActionButton>
-                    <ActionButton onClick={() => void copyRichNotes()}>
-                      <Copy className="h-4 w-4" />
-                      Copy
-                    </ActionButton>
-                  </div>
-                }
-              >
-                <pre className="min-h-[280px] whitespace-pre-wrap break-words rounded-3xl border border-slate-200 bg-slate-50 p-5 font-mono text-sm leading-7 text-slate-700">
-                  {detail.rich_notes || "No rich notes generated yet."}
-                </pre>
-              </StudioCard>
-
-              <section className="grid items-stretch gap-5 xl:grid-cols-2">
-                <StudioCard
-                  bodyClassName="h-full"
-                  className="h-full"
-                  title="Flashcards"
-                  subtitle="Create revision cards grounded in the transcript."
-                  actions={
-                    <div className="flex flex-wrap gap-3">
-                      <ActionButton
-                        busy={busyKey === "flashcards"}
-                        onClick={() => void generateArtifact("flashcards")}
-                      >
-                        <GraduationCap className="h-4 w-4" />
-                        Generate
-                      </ActionButton>
-                      <ActionButton
-                        disabled={flashcardIndex === 0 || !flashcards.length}
-                        onClick={() => setFlashcardIndex((current) => Math.max(current - 1, 0))}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                        Prev
-                      </ActionButton>
-                      <ActionButton
-                        disabled={!flashcards.length || flashcardIndex >= flashcards.length - 1}
-                        onClick={() =>
-                          setFlashcardIndex((current) =>
-                            Math.min(current + 1, Math.max(flashcards.length - 1, 0)),
-                          )
-                        }
-                      >
-                        Next
-                        <ChevronRight className="h-4 w-4" />
-                      </ActionButton>
-                    </div>
-                  }
-                >
-                  {currentFlashcard ? (
-                    <div className="h-full rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
-                        Card {flashcardIndex + 1} of {flashcards.length}
-                      </p>
-                      <h4 className="mt-4 text-lg font-semibold text-slate-950">
-                        {currentFlashcard.question || "Question"}
-                      </h4>
-                      <p className="mt-4 break-words text-sm leading-7 text-slate-700">
-                        <span className="font-semibold text-slate-950">Answer:</span>{" "}
-                        {currentFlashcard.answer || ""}
-                      </p>
-                      {currentFlashcard.explanation ? (
-                        <p className="mt-4 break-words text-sm leading-7 text-slate-500">
-                          {currentFlashcard.explanation}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
-                      No flashcards yet.
-                    </div>
-                  )}
-                </StudioCard>
-
-                <StudioCard
-                  bodyClassName="h-full"
-                  className="h-full"
-                  title="Quiz"
-                  subtitle="Build a transcript-grounded multiple-choice quiz."
-                  actions={
-                    <div className="flex flex-wrap gap-3">
-                      <ActionButton
-                        busy={busyKey === "quiz"}
-                        onClick={() => void generateArtifact("quiz")}
-                      >
-                        <Sparkles className="h-4 w-4" />
-                        Generate
-                      </ActionButton>
-                      <ActionButton
-                        disabled={quizIndex === 0 || !quizQuestions.length}
-                        onClick={() => setQuizIndex((current) => Math.max(current - 1, 0))}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                        Prev
-                      </ActionButton>
-                      <ActionButton
-                        disabled={!quizQuestions.length || quizIndex >= quizQuestions.length - 1}
-                        onClick={() =>
-                          setQuizIndex((current) =>
-                            Math.min(current + 1, Math.max(quizQuestions.length - 1, 0)),
-                          )
-                        }
-                      >
-                        Next
-                        <ChevronRight className="h-4 w-4" />
-                      </ActionButton>
-                    </div>
-                  }
-                >
-                  {currentQuiz ? (
-                    <div className="h-full rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
-                        Question {quizIndex + 1} of {quizQuestions.length}
-                      </p>
-                      <h4 className="text-lg font-semibold text-slate-950">
-                        {currentQuiz.question || "Quiz question"}
-                      </h4>
-                      <div className="mt-4 space-y-2">
-                        {(currentQuiz.options ?? []).map((option, index) => (
-                          <div
-                            key={`${option}-${index}`}
-                            className={`rounded-2xl border px-4 py-3 text-sm ${
-                              index === currentQuiz.answer_index
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                                : "border-slate-200 bg-white text-slate-700"
-                            }`}
-                          >
-                            {String.fromCharCode(65 + index)}. {option}
-                          </div>
-                        ))}
-                      </div>
-                      {currentQuiz.explanation ? (
-                        <p className="mt-4 break-words text-sm leading-7 text-slate-500">
-                          {currentQuiz.explanation}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
-                      No quiz generated yet.
-                    </div>
-                  )}
-                </StudioCard>
-              </section>
-
-              <StudioCard
-                bodyClassName="h-full"
-                className="h-full"
-                title="Podcast"
-                subtitle="Generate a compact spoken recap from the selected transcript."
-                actions={
-                  <div className="flex flex-wrap gap-3">
-                    <ActionButton
-                      busy={busyKey === "podcast"}
-                      onClick={() => void generateArtifact("podcast")}
-                    >
-                      <Mic2 className="h-4 w-4" />
-                      Generate
-                    </ActionButton>
-                    <ActionButton onClick={playPodcast}>
-                      <PlayCircle className="h-4 w-4" />
-                      Play script
-                    </ActionButton>
-                  </div>
-                }
-              >
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                  <div className="grid gap-3 xl:grid-cols-2">
-                    {detail.podcast?.script?.length ? (
-                      detail.podcast.script.slice(0, 6).map((line, index) => (
-                        <div
-                          key={`${line.speaker ?? "speaker"}-${index}`}
-                          className="rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-700"
-                        >
-                          <span className="font-semibold text-slate-950">
-                            {line.speaker || "Host"}:
-                          </span>{" "}
-                          {line.line || ""}
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-slate-500">
-                        No podcast script generated yet.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </StudioCard>
-
-              <StudioCard
-                title="Mind map"
-                subtitle="Generate a structured visual map of the session so the main branches and supporting ideas are easier to scan."
-                actions={
-                  <div className="flex flex-wrap gap-3">
-                    <ActionButton
-                      busy={busyKey === "mindmap"}
-                      onClick={() => void generateArtifact("mindmap")}
-                    >
-                      <Network className="h-4 w-4" />
-                      Generate
-                    </ActionButton>
-                    <ActionButton onClick={downloadMindMap}>
-                      <Download className="h-4 w-4" />
-                      Download map
-                    </ActionButton>
-                  </div>
-                }
-              >
-                <MindMapPreview
-                  mermaid={detail.mind_map?.mermaid}
-                  outline={detail.mind_map?.outline}
-                  title={detail.mind_map?.title || detail.title || "Mind Map"}
-                />
-              </StudioCard>
-
-              <StudioCard
-                bodyClassName="h-full"
-                title="Transcript chat"
-                subtitle="Ask questions against the selected transcript and keep the conversation grounded in session context."
-              >
-                <div className="space-y-4">
-                  <div className="max-h-[360px] space-y-3 overflow-y-auto rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                    {chatHistory.length ? (
-                      chatHistory.map((message, index) => (
-                        <div
-                          key={`${message.role}-${index}`}
-                          className={`rounded-2xl border px-4 py-3 text-sm leading-7 ${
-                            message.role === "user"
-                              ? "border-sky-200 bg-sky-50 text-slate-800"
-                              : "border-violet-200 bg-violet-50 text-slate-800"
-                          }`}
-                        >
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-                            {message.role}
-                          </p>
-                          <p className="mt-2 whitespace-pre-wrap">{message.content}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
-                        Ask anything about this transcript and the backend will answer using the selected session context.
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <textarea
-                      className="min-h-[110px] flex-1 rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                      onChange={(event) => setChatInput(event.target.value)}
-                      placeholder="Ask about decisions, action items, concepts, or follow-ups."
-                      value={chatInput}
-                    />
-                    <div className="sm:w-[180px] sm:self-end">
-                      <ActionButton
-                        busy={busyKey === "chat"}
-                        onClick={() => void sendChat()}
-                        primary
-                      >
-                        <MessageSquareText className="h-4 w-4" />
-                        Ask Studio
-                      </ActionButton>
-                    </div>
-                  </div>
-                </div>
-              </StudioCard>
-
-              <section className="grid items-stretch gap-5 xl:grid-cols-2">
+          {/* ══════════════════════════════════════════════════════════════════
+              ROW 8 — Action Items  |  OCR Notes
+          ══════════════════════════════════════════════════════════════════ */}
+          <section className="grid items-stretch gap-5 md:grid-cols-2">
                 <StudioCard
                   bodyClassName="h-full"
                   title="Action Items"
@@ -1391,41 +1454,67 @@ export function StudioPageClient() {
                 >
                   {detail.action_items && detail.action_items.length > 0 ? (
                     <div className="space-y-3">
-                      {detail.action_items.map((item: { action: string; owner?: string; due_date?: string; priority?: string; status?: string }, index: number) => (
-                        <div
-                          key={index}
-                          className="rounded-3xl border border-slate-200 bg-slate-50 p-4"
-                        >
-                          <div className="flex items-start gap-3">
-                            <CheckSquare className="h-5 w-5 flex-shrink-0 text-sky-600 mt-1" />
-                            <div className="min-w-0 flex-1">
-                              <p className="font-semibold text-slate-950">{item.action}</p>
-                              {item.owner && (
-                                <p className="text-xs text-slate-500 mt-1">Owner: {item.owner}</p>
-                              )}
-                              {item.due_date && (
-                                <p className="text-xs text-slate-500">Due: {item.due_date}</p>
-                              )}
-                              <div className="mt-2 flex gap-2">
-                                <span
-                                  className={`text-[10px] font-semibold px-2 py-1 rounded-full ${
-                                    item.priority === "high"
-                                      ? "bg-red-100 text-red-700"
-                                      : item.priority === "medium"
-                                        ? "bg-amber-100 text-amber-700"
-                                        : "bg-green-100 text-green-700"
-                                  }`}
-                                >
-                                  {item.priority?.toUpperCase() || "MEDIUM"}
-                                </span>
+                      {detail.action_items.map(
+                        (item: {
+                          action: string;
+                          owner?: string;
+                          due_date?: string;
+                          priority?: string;
+                          status?: string;
+                        }, index: number) => (
+                          <div
+                            key={index}
+                            className="rounded-3xl p-4"
+                            style={SUBCARD}
+                          >
+                            <div className="flex items-start gap-3">
+                              <CheckSquare
+                                className="h-5 w-5 flex-shrink-0 mt-1"
+                                style={{ color: "#00d4ff" }}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-white">{item.action}</p>
+                                {item.owner && (
+                                  <p
+                                    className="text-xs mt-1"
+                                    style={{ color: "rgba(255,255,255,0.45)" }}
+                                  >
+                                    Owner: {item.owner}
+                                  </p>
+                                )}
+                                {item.due_date && (
+                                  <p
+                                    className="text-xs"
+                                    style={{ color: "rgba(255,255,255,0.45)" }}
+                                  >
+                                    Due: {item.due_date}
+                                  </p>
+                                )}
+                                <div className="mt-2 flex gap-2">
+                                  <span
+                                    className="text-[10px] font-bold px-2 py-1 rounded-full"
+                                    style={
+                                      item.priority === "high"
+                                        ? { background: "rgba(239,68,68,0.12)", color: "#fca5a5" }
+                                        : item.priority === "medium"
+                                          ? { background: "rgba(251,191,36,0.12)", color: "#fde68a" }
+                                          : { background: "rgba(52,211,153,0.12)", color: "#34d399" }
+                                    }
+                                  >
+                                    {item.priority?.toUpperCase() || "MEDIUM"}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ),
+                      )}
                     </div>
                   ) : (
-                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
+                    <div
+                      className="rounded-3xl p-5 text-sm"
+                      style={{ ...SUBCARD, color: "rgba(255,255,255,0.35)" }}
+                    >
                       No action items extracted yet. Click Extract to generate.
                     </div>
                   )}
@@ -1438,7 +1527,11 @@ export function StudioPageClient() {
                 >
                   <div className="space-y-4">
                     <div
-                      className="border-2 border-dashed border-slate-200 rounded-3xl p-6 text-center hover:bg-slate-50 transition cursor-pointer"
+                      className="rounded-3xl p-6 text-center transition cursor-pointer hover:opacity-90"
+                      style={{
+                        border: "2px dashed rgba(255,255,255,0.12)",
+                        background: "rgba(255,255,255,0.02)",
+                      }}
                       onClick={() => {
                         const input = document.createElement("input");
                         input.type = "file";
@@ -1450,44 +1543,73 @@ export function StudioPageClient() {
                         input.click();
                       }}
                     >
-                      <Upload className="h-8 w-8 mx-auto text-slate-400 mb-2" />
-                      <p className="text-sm font-semibold text-slate-700">
+                      <Upload
+                        className="h-8 w-8 mx-auto mb-2"
+                        style={{ color: "rgba(255,255,255,0.35)" }}
+                      />
+                      <p className="text-sm font-semibold text-white">
                         Click to upload image
                       </p>
-                      <p className="text-xs text-slate-500 mt-1">
+                      <p
+                        className="text-xs mt-1"
+                        style={{ color: "rgba(255,255,255,0.35)" }}
+                      >
                         PNG, JPG, or PDF up to 10MB
                       </p>
                     </div>
 
                     {detail.uploaded_notes && detail.uploaded_notes.length > 0 && (
                       <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                        {detail.uploaded_notes.map((note: { timestamp: string; text: string; file_type: string; confidence: string }, index: number) => (
-                          <div
-                            key={index}
-                            className="rounded-3xl border border-slate-200 bg-slate-50 p-4"
-                          >
-                            <div className="flex justify-between items-start mb-2">
-                              <p className="text-xs text-slate-500">
-                                {new Date(note.timestamp).toLocaleString()}
+                        {detail.uploaded_notes.map(
+                          (
+                            note: {
+                              timestamp: string;
+                              text: string;
+                              file_type: string;
+                              confidence: string;
+                            },
+                            index: number,
+                          ) => (
+                            <div
+                              key={index}
+                              className="rounded-3xl p-4"
+                              style={SUBCARD}
+                            >
+                              <div className="flex justify-between items-start mb-2">
+                                <p
+                                  className="text-xs"
+                                  style={{ color: "rgba(255,255,255,0.4)" }}
+                                >
+                                  {new Date(note.timestamp).toLocaleString()}
+                                </p>
+                                <span
+                                  className="text-[10px] font-bold px-2 py-1 rounded-full"
+                                  style={
+                                    note.confidence === "high"
+                                      ? { background: "rgba(52,211,153,0.12)", color: "#34d399" }
+                                      : note.confidence === "medium"
+                                        ? { background: "rgba(251,191,36,0.12)", color: "#fde68a" }
+                                        : { background: "rgba(239,68,68,0.12)", color: "#fca5a5" }
+                                  }
+                                >
+                                  {(note.confidence || "medium").toUpperCase()}
+                                </span>
+                              </div>
+                              <p
+                                className="text-xs mb-2"
+                                style={{ color: "rgba(255,255,255,0.35)" }}
+                              >
+                                Type: {note.file_type} • Characters: {(note.text || "").length}
                               </p>
-                              <span className={`text-[10px] font-semibold px-2 py-1 rounded-full ${
-                                note.confidence === "high"
-                                  ? "bg-green-100 text-green-700"
-                                  : note.confidence === "medium"
-                                    ? "bg-amber-100 text-amber-700"
-                                    : "bg-red-100 text-red-700"
-                              }`}>
-                                {(note.confidence || "medium").toUpperCase()}
-                              </span>
+                              <p
+                                className="text-sm break-words whitespace-pre-wrap"
+                                style={{ color: "rgba(255,255,255,0.65)" }}
+                              >
+                                {note.text}
+                              </p>
                             </div>
-                            <p className="text-xs text-slate-400 mb-2">
-                              Type: {note.file_type} • Characters: {(note.text || "").length}
-                            </p>
-                            <p className="text-sm text-slate-700 break-words whitespace-pre-wrap">
-                              {note.text}
-                            </p>
-                          </div>
-                        ))}
+                          ),
+                        )}
                       </div>
                     )}
                   </div>
@@ -1495,9 +1617,6 @@ export function StudioPageClient() {
               </section>
             </>
           )}
-        </div>
-      </div>
     </div>
   );
 }
-

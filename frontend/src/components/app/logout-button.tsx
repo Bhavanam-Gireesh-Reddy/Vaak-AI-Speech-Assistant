@@ -13,7 +13,6 @@ export function LogoutButton() {
 
   async function handleLogout() {
     setIsSubmitting(true);
-
     try {
       await logout();
       router.push("/login");
@@ -25,12 +24,17 @@ export function LogoutButton() {
 
   return (
     <button
-      className="inline-flex h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+      style={{
+        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        color: "rgba(255,255,255,0.5)",
+      }}
       disabled={isSubmitting}
       onClick={handleLogout}
       type="button"
     >
-      <LogOut className="h-4 w-4" />
+      <LogOut className="h-3.5 w-3.5" />
       {isSubmitting ? "Signing out..." : "Sign out"}
     </button>
   );
