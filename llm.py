@@ -1,7 +1,8 @@
 """
-LLM helper — Gemini API (Gemma 4) for text, Groq for vision
-- Text model : gemma-4-31b-it via Google Gemini API
-- Vision model: meta-llama/llama-4-scout-17b-16e-instruct via Groq
+LLM helper — Gemini API for session analysis, Groq for title + vision
+- Analysis model : gemini-2.5-flash via Google Gemini API
+- Title model    : llama-3.3-70b-versatile via Groq (dedicated, different from analysis)
+- Vision model   : meta-llama/llama-4-scout-17b-16e-instruct via Groq (OCR)
 """
 
 import os
@@ -82,7 +83,87 @@ async def call_groq(prompt: str, system: str, max_tokens: int = 2000) -> str:
 
 
 GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+GROQ_TITLE_MODEL  = os.getenv("GROQ_TITLE_MODEL", "llama-3.3-70b-versatile")
 _GROQ_VISION_MAX_B64 = 4 * 1024 * 1024  # Groq limit: 4MB base64
+
+
+async def call_groq_text(prompt: str, system: str, model: str = None, max_tokens: int = 200) -> str:
+    """Call Groq text chat completions. Separate from Gemini path so title uses a different model."""
+    api_key = _groq_key()
+    if not api_key:
+        print("  [Groq Text] ❌ GROQ_API_KEY not set")
+        return ""
+
+    use_model = model or GROQ_TITLE_MODEL
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": use_model,
+        "max_tokens": max_tokens,
+        "temperature": 0.3,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user",   "content": prompt},
+        ],
+    }
+
+    try:
+        print(f"  [Groq Text] 🔶 Calling {use_model}...")
+        async with httpx.AsyncClient(timeout=30) as client:
+            res = await client.post(GROQ_URL, headers=headers, json=payload)
+            if res.status_code == 429:
+                print(f"  [Groq Text] ⚠️ 429 rate limit on {use_model}")
+                return ""
+            if res.status_code != 200:
+                print(f"  [Groq Text] HTTP {res.status_code}: {res.text[:200]}")
+                return ""
+            data = res.json()
+            content = data["choices"][0]["message"]["content"].strip()
+            print(f"  [Groq Text] ✅ {use_model} responded ({len(content)} chars)")
+            return content
+    except httpx.TimeoutException:
+        print("  [Groq Text] ⚠️ Request timed out")
+        return ""
+    except Exception as e:
+        print(f"  [Groq Text] Error: {e}")
+        return ""
+
+
+_TITLE_SYSTEM = (
+    "You generate concise session titles. "
+    "Return ONLY a 2-5 word title describing the core topic. "
+    "No quotes, no punctuation at the end, no prefixes like 'Title:'. "
+    "Examples: Operating Systems Basics, CPU Pipelining, Meeting With Product Team."
+)
+
+
+async def generate_title_groq(transcript: str, fallback: str = "") -> str:
+    """Dedicated Groq title generation — uses a different model than the main analysis LLM."""
+    text = (transcript or "").strip()
+    if not text:
+        return fallback
+
+    excerpt = text[:4000]
+    raw = await call_groq_text(
+        f"Transcript excerpt:\n\n{excerpt}\n\nGive the title.",
+        _TITLE_SYSTEM,
+        max_tokens=40,
+    )
+
+    if not raw:
+        return fallback
+
+    title = raw.strip().strip('"').strip("'")
+    title = re.sub(r"^(title|topic)\s*[:\-]\s*", "", title, flags=re.IGNORECASE)
+    title = title.splitlines()[0].strip()
+    title = title.rstrip(".!?,;:")
+    words = title.split()
+    if len(words) > 8:
+        title = " ".join(words[:8])
+    return title or fallback
+
 
 async def call_groq_vision(image_base64: str, file_type: str = "image/png", prompt: str = "", system: str = "") -> str:
     """Send an image to Groq Vision API (Llama 4 Scout) for OCR / image understanding."""
@@ -224,11 +305,14 @@ async def process_session(sentences: list) -> dict:
         summary   = data.get("summary",   "")
         filtered  = data.get("filtered_transcript",  "")
         corrected = data.get("corrected_transcript", "")
-        title     = data.get("title",     "")
+        gemini_title = data.get("title",     "")
         speakers  = data.get("speakers",  [])
         notes     = data.get("notes",     "")
 
-        print(f"  [LLM] ✅ {GEMINI_MODEL} → Title:'{title}' Speakers:{len(speakers)} Notes:{len(notes)} chars Summary:{len(summary)} chars")
+        groq_title = await generate_title_groq(corrected or filtered or text, fallback=gemini_title)
+        title = groq_title or gemini_title
+
+        print(f"  [LLM] ✅ {GEMINI_MODEL} + {GROQ_TITLE_MODEL} → Title:'{title}' Speakers:{len(speakers)} Notes:{len(notes)} chars Summary:{len(summary)} chars")
         return {
             "summary":              summary,
             "filtered_transcript":  filtered,
@@ -250,10 +334,12 @@ async def process_session(sentences: list) -> dict:
             summary   = sm_match.group(1).replace("\\n", "\n") if sm_match else ""
             filtered  = ft_match.group(1).replace("\\n", "\n") if ft_match else ""
             corrected = ct_match.group(1).replace("\\n", "\n") if ct_match else ""
-            title     = ti_match.group(1)                       if ti_match else ""
+            gemini_title = ti_match.group(1)                       if ti_match else ""
             notes     = nt_match.group(1).replace("\\n", "\n") if nt_match else ""
 
-            print(f"  [LLM] Regex fallback — title:'{title}' notes:{len(notes)} chars summary:{len(summary)} chars")
+            title = await generate_title_groq(corrected or filtered or text, fallback=gemini_title)
+
+            print(f"  [LLM] Regex fallback — title:'{title}' (Groq) notes:{len(notes)} chars summary:{len(summary)} chars")
             return {
                 "summary":              summary,
                 "filtered_transcript":  filtered,
