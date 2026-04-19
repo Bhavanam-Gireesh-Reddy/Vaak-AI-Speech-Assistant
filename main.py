@@ -292,6 +292,10 @@ async def favicon():
 
 @app.get("/api/health")
 async def health_check():
+    gemini_key = bool(os.getenv("GEMINI_API_KEY", "").strip())
+    groq_key   = bool(os.getenv("GROQ_API_KEY", "").strip())
+    sarvam_env = os.getenv("SARVAM_API_KEY", "").strip()
+    sarvam_key = bool(sarvam_env) and sarvam_env != "YOUR_SARVAM_API_KEY_HERE"
     return JSONResponse(
         {
             "ok": True,
@@ -299,6 +303,11 @@ async def health_check():
             "auth_available": bool(AUTH_AVAILABLE),
             "mongo_connected": db_collection is not None,
             "frontend_url_configured": bool(get_frontend_url()),
+            "llm_available": bool(LLM_AVAILABLE),
+            "ai_features_available": bool(AI_FEATURES_AVAILABLE),
+            "gemini_key_loaded": gemini_key,
+            "groq_key_loaded": groq_key,
+            "sarvam_key_loaded": sarvam_key,
         }
     )
 
@@ -574,12 +583,13 @@ async def translate_session(session_id: str, body: dict, request: Request):
     """Translate a saved session transcript to a target language."""
     if db_collection is None:
         return JSONResponse({"error": "MongoDB not connected"}, status_code=503)
-    query = {"session_id": session_id}
     if AUTH_AVAILABLE:
         user = get_current_user(request)
         if not user:
             return JSONResponse({"error": "Unauthorized"}, status_code=401)
-        query["user_id"] = user["sub"]
+    else:
+        user = None
+    query = {"session_id": session_id, "user_id": scope_user_id(user)}
     doc = await db_collection.find_one(query, {"_id": 0})
     if not doc:
         return JSONResponse({"error": "Session not found"}, status_code=404)
@@ -607,12 +617,13 @@ async def translate_session(session_id: str, body: dict, request: Request):
 async def get_session(session_id: str, request: Request):
     if db_collection is None:
         return JSONResponse({"error": "MongoDB not connected"}, status_code=503)
-    query = {"session_id": session_id}
     if AUTH_AVAILABLE:
         user = get_current_user(request)
         if not user:
             return JSONResponse({"error": "Unauthorized"}, status_code=401)
-        query["user_id"] = user["sub"]
+    else:
+        user = None
+    query = {"session_id": session_id, "user_id": scope_user_id(user)}
     doc = await db_collection.find_one(query, {"_id": 0})
     if not doc:
         return JSONResponse({"error": "Not found"}, status_code=404)
@@ -1168,12 +1179,28 @@ def pcm_to_wav(pcm_data: bytes, sample_rate: int, channels: int) -> bytes:
     return buf.getvalue()
 
 
+def scope_user_id(user: dict | None) -> str:
+    """Return the user_id to scope DB queries with. Falls back to 'local' for
+    single-user dev mode so queries are NEVER unscoped against sessions."""
+    if user and user.get("sub"):
+        return user["sub"]
+    return "local"
+
+
 def build_user_query(request: Request, extra: dict) -> dict:
-    """Build MongoDB query — appends user_id filter if auth is available."""
+    """Build MongoDB query — always scopes to the requesting user.
+
+    Session isolation rule: a query must NEVER run unscoped against the
+    sessions collection. If auth is disabled (single-user dev mode), we
+    scope to user_id='local' so a later deploy that flips AUTH_AVAILABLE
+    can't accidentally expose legacy sessions to other users.
+    """
+    extra = dict(extra)
     if not AUTH_AVAILABLE:
-        return dict(extra)
+        extra["user_id"] = "local"
+        return extra
     user = get_current_user(request)
-    if user:
+    if user and user.get("sub"):
         extra["user_id"] = user["sub"]
     else:
         extra["user_id"] = "UNAUTHORIZED_USER"
@@ -1197,9 +1224,7 @@ async def get_session_for_user(session_id: str, request: Request, x_api_key: str
     user = await get_authenticated_user(request, x_api_key)
     if not user:
         return None, JSONResponse({"error": "Unauthorized"}, status_code=401)
-    query = {"session_id": session_id}
-    if AUTH_AVAILABLE:
-        query["user_id"] = user["sub"]
+    query = {"session_id": session_id, "user_id": user.get("sub") or "local"}
     doc = await db_collection.find_one(query, {"_id": 0})
     if not doc:
         return None, JSONResponse({"error": "Session not found"}, status_code=404)
@@ -1518,11 +1543,8 @@ async def v1_list_sessions(
     if db_collection is None:
         return JSONResponse({"error": "DB not connected"}, status_code=503)
     skip   = (page - 1) * limit
-    # Only return sessions owned by this user — never expose orphaned sessions
-    if AUTH_AVAILABLE:
-        query = {"user_id": user["sub"]}
-    else:
-        query = {}
+    # Always scope to the authenticated user — sessions collection must never be unscoped
+    query = {"user_id": scope_user_id(user)}
     cursor = db_collection.find(query, {"_id": 0, "sentences": 0}).sort("started_at", -1).skip(skip).limit(limit)
     total  = await db_collection.count_documents(query)
     items  = await cursor.to_list(length=limit)
@@ -1540,9 +1562,7 @@ async def v1_get_session(
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
     if db_collection is None:
         return JSONResponse({"error": "DB not connected"}, status_code=503)
-    q   = {"session_id": session_id}
-    if AUTH_AVAILABLE:
-        q["user_id"] = user["sub"]
+    q   = {"session_id": session_id, "user_id": scope_user_id(user)}
     doc = await db_collection.find_one(q, {"_id": 0})
     if not doc:
         return JSONResponse({"error": "Not found"}, status_code=404)
@@ -1563,9 +1583,7 @@ async def v1_get_transcript(
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
     if db_collection is None:
         return JSONResponse({"error": "DB not connected"}, status_code=503)
-    q   = {"session_id": session_id}
-    if AUTH_AVAILABLE:
-        q["user_id"] = user["sub"]
+    q   = {"session_id": session_id, "user_id": scope_user_id(user)}
     doc = await db_collection.find_one(q, {"_id": 0, "transcript": 1,
                                             "corrected_transcript": 1, "filtered_transcript": 1, "title": 1})
     if not doc:
@@ -1591,9 +1609,7 @@ async def v1_delete_session(
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
     if db_collection is None:
         return JSONResponse({"error": "DB not connected"}, status_code=503)
-    q      = {"session_id": session_id}
-    if AUTH_AVAILABLE:
-        q["user_id"] = user["sub"]
+    q      = {"session_id": session_id, "user_id": scope_user_id(user)}
     result = await db_collection.delete_one(q)
     if result.deleted_count == 0:
         return JSONResponse({"error": "Not found or not yours"}, status_code=404)
@@ -1612,7 +1628,7 @@ async def v1_search(
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
     if db_collection is None:
         return JSONResponse({"error": "DB not connected"}, status_code=503)
-    base = {"user_id": user["sub"]} if AUTH_AVAILABLE else {}
+    base = {"user_id": scope_user_id(user)}
     if not q.strip():
         cursor = db_collection.find(base, {"_id": 0, "sentences": 0}).sort("started_at", -1).limit(limit)
         return JSONResponse(await cursor.to_list(length=limit))
@@ -1620,7 +1636,7 @@ async def v1_search(
     text_query = {"$or": [{"transcript": pattern}, {"corrected_transcript": pattern},
                            {"filtered_transcript": pattern}, {"summary": pattern}]
                  } if field == "all" else {field: pattern}
-    query  = {"$and": [base, text_query]} if base else text_query
+    query  = {"$and": [base, text_query]}
     cursor = db_collection.find(query, {"_id": 0, "sentences": 0}).sort("started_at", -1).limit(limit)
     return JSONResponse(await cursor.to_list(length=limit))
 
@@ -1634,7 +1650,7 @@ async def v1_stats(request: Request, x_api_key: str = Header(default="")):
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
     if db_collection is None:
         return JSONResponse({"error": "DB not connected"}, status_code=503)
-    q      = {"user_id": user["sub"]} if AUTH_AVAILABLE else {}
+    q      = {"user_id": scope_user_id(user)}
     cursor = db_collection.find(q, {"_id": 0, "session_id": 1, "started_at": 1,
         "ended_at": 1, "word_count": 1, "sentence_count": 1, "language": 1, "mode": 1, "title": 1}
     ).sort("started_at", 1).limit(500)
@@ -2204,14 +2220,11 @@ async def get_folder_suggestion(request: Request, session_id: str = "", x_api_ke
     if not session_id:
         return JSONResponse({"error": "session_id required"}, status_code=400)
     
-    query = {"session_id": session_id}
-    if AUTH_AVAILABLE:
-        query["user_id"] = user["sub"]
-    
+    query = {"session_id": session_id, "user_id": scope_user_id(user)}
     doc = await db_collection.find_one(query, {"_id": 0})
     if not doc:
         return JSONResponse({"error": "Session not found"}, status_code=404)
-    
+
     suggested_folder = suggest_folder_for_session(doc, [])
     return JSONResponse({"suggested_folder": suggested_folder})
 
@@ -2226,7 +2239,7 @@ async def list_folders(request: Request, x_api_key: str = Header(default="")):
     if AUTH_AVAILABLE and not user:
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
     
-    query = {"user_id": user["sub"]} if AUTH_AVAILABLE else {}
+    query = {"user_id": scope_user_id(user)}
     cursor = db_collection.find(query, {"_id": 0, "folder_id": 1}).limit(1)
     return JSONResponse({"message": "Folders endpoint - implement collection-based folders"})
 

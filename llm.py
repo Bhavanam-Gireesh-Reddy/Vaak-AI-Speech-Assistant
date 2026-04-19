@@ -268,6 +268,26 @@ CRITICAL: Return ONLY valid JSON on a single line. Use \\n for newlines inside s
 No markdown fences, no explanation, no extra text."""
 
 
+def _heuristic_title(text: str) -> str:
+    """Derive a short title from transcript text when the LLM is unavailable."""
+    words = re.findall(r"\S+", (text or "").strip())
+    if not words:
+        return "Session"
+    snippet = " ".join(words[:6])
+    snippet = snippet.rstrip(".!?,;:")
+    return snippet or "Session"
+
+
+def _heuristic_summary(text: str) -> str:
+    """Clip the raw transcript to a short preview as a summary fallback."""
+    t = (text or "").strip()
+    if not t:
+        return ""
+    if len(t) <= 320:
+        return t
+    return t[:320].rsplit(" ", 1)[0] + "…"
+
+
 async def process_session(sentences: list) -> dict:
     """Called once when session stops. Returns all analysis fields."""
     empty = {"summary": "", "filtered_transcript": "", "corrected_transcript": "", "title": "", "speakers": [], "notes": ""}
@@ -277,6 +297,9 @@ async def process_session(sentences: list) -> dict:
     text = " ".join(sentences)
     print(f"  [LLM] Processing {len(sentences)} sentences ({len(text)} chars) with {GEMINI_MODEL}...")
 
+    fallback_title   = _heuristic_title(text)
+    fallback_summary = _heuristic_summary(text)
+
     result = await call_groq(
         f"Analyze this transcript:\n\n{text}",
         COMBINED_SYSTEM,
@@ -284,7 +307,17 @@ async def process_session(sentences: list) -> dict:
     )
 
     if not result:
-        return empty
+        # Gemini failed — still try Groq for the title alone, and hand back a
+        # heuristic summary so the frontend always has something to render.
+        groq_title = await generate_title_groq(text, fallback=fallback_title)
+        return {
+            "summary": fallback_summary,
+            "filtered_transcript": "",
+            "corrected_transcript": text,
+            "title": groq_title or fallback_title,
+            "speakers": [],
+            "notes": "",
+        }
 
     try:
         cleaned = result.strip()
@@ -310,7 +343,9 @@ async def process_session(sentences: list) -> dict:
         notes     = data.get("notes",     "")
 
         groq_title = await generate_title_groq(corrected or filtered or text, fallback=gemini_title)
-        title = groq_title or gemini_title
+        title = groq_title or gemini_title or fallback_title
+        if not summary:
+            summary = fallback_summary
 
         print(f"  [LLM] ✅ {GEMINI_MODEL} + {GROQ_TITLE_MODEL} → Title:'{title}' Speakers:{len(speakers)} Notes:{len(notes)} chars Summary:{len(summary)} chars")
         return {
@@ -337,32 +372,130 @@ async def process_session(sentences: list) -> dict:
             gemini_title = ti_match.group(1)                       if ti_match else ""
             notes     = nt_match.group(1).replace("\\n", "\n") if nt_match else ""
 
-            title = await generate_title_groq(corrected or filtered or text, fallback=gemini_title)
+            title = await generate_title_groq(corrected or filtered or text, fallback=gemini_title or fallback_title)
+            if not summary:
+                summary = fallback_summary
 
             print(f"  [LLM] Regex fallback — title:'{title}' (Groq) notes:{len(notes)} chars summary:{len(summary)} chars")
             return {
-                "summary":              summary,
+                "summary":              summary or fallback_summary,
                 "filtered_transcript":  filtered,
-                "corrected_transcript": corrected,
-                "title":                title,
+                "corrected_transcript": corrected or text,
+                "title":                title or fallback_title,
                 "speakers":             [],
                 "notes":                notes,
             }
         except Exception as e2:
             print(f"  [LLM] Regex fallback failed: {e2}")
-            return empty
+            return {
+                "summary": fallback_summary,
+                "filtered_transcript": "",
+                "corrected_transcript": text,
+                "title": fallback_title,
+                "speakers": [],
+                "notes": "",
+            }
 
 
 # ── Translate a transcript ────────────────────────────────────────────────────
 LANG_NAMES = {
     "en": "English", "hi": "Hindi",   "ta": "Tamil",    "te": "Telugu",
     "kn": "Kannada", "ml": "Malayalam","bn": "Bengali",  "mr": "Marathi",
-    "gu": "Gujarati","pa": "Punjabi",  "fr": "French",   "es": "Spanish",
-    "de": "German",  "ja": "Japanese", "zh": "Chinese",  "ar": "Arabic",
+    "gu": "Gujarati","pa": "Punjabi",  "or": "Odia",     "as": "Assamese",
+    "fr": "French",  "es": "Spanish",  "de": "German",   "ja": "Japanese",
+    "zh": "Chinese", "ar": "Arabic",
 }
 
+# Indian languages routed to Sarvam AI translation; everything else goes to Gemini.
+INDIAN_LANGS = {"hi", "ta", "te", "kn", "ml", "bn", "mr", "gu", "pa", "or", "as"}
+
+# Sarvam expects BCP-47 style codes like "hi-IN", "ta-IN".
+_SARVAM_LANG = {
+    "hi": "hi-IN", "ta": "ta-IN", "te": "te-IN", "kn": "kn-IN",
+    "ml": "ml-IN", "bn": "bn-IN", "mr": "mr-IN", "gu": "gu-IN",
+    "pa": "pa-IN", "or": "od-IN", "as": "as-IN", "en": "en-IN",
+}
+
+SARVAM_TRANSLATE_URL = "https://api.sarvam.ai/translate"
+# Sarvam limits each request to ~1000 chars — chunk longer text.
+_SARVAM_CHUNK = 900
+
+
+def _sarvam_key() -> str:
+    return os.getenv("SARVAM_API_KEY", "")
+
+
+def _chunk_text(text: str, size: int) -> list:
+    text = text or ""
+    if len(text) <= size:
+        return [text] if text else []
+    chunks, buf = [], []
+    length = 0
+    for part in re.split(r"(?<=[\.\!\?\n])\s+", text):
+        if length + len(part) + 1 > size and buf:
+            chunks.append(" ".join(buf).strip())
+            buf, length = [], 0
+        buf.append(part)
+        length += len(part) + 1
+    if buf:
+        chunks.append(" ".join(buf).strip())
+    return [c for c in chunks if c]
+
+
+async def translate_sarvam(text: str, target_lang: str, source_lang: str = "auto") -> str:
+    """Translate Indian-language text using Sarvam AI translation API."""
+    api_key = _sarvam_key()
+    if not api_key:
+        print("  [Sarvam TL] ❌ SARVAM_API_KEY not set")
+        return ""
+
+    target = _SARVAM_LANG.get(target_lang, target_lang)
+    source = _SARVAM_LANG.get(source_lang, "auto") if source_lang != "auto" else "auto"
+
+    headers = {
+        "api-subscription-key": api_key,
+        "Content-Type": "application/json",
+    }
+
+    out_parts = []
+    for chunk in _chunk_text(text, _SARVAM_CHUNK):
+        payload = {
+            "input": chunk,
+            "source_language_code": source,
+            "target_language_code": target,
+            "speaker_gender": "Male",
+            "mode": "formal",
+            "enable_preprocessing": False,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=45) as client:
+                res = await client.post(SARVAM_TRANSLATE_URL, headers=headers, json=payload)
+                if res.status_code != 200:
+                    print(f"  [Sarvam TL] HTTP {res.status_code}: {res.text[:200]}")
+                    return ""
+                data = res.json()
+                out_parts.append(data.get("translated_text") or "")
+        except Exception as e:
+            print(f"  [Sarvam TL] Error: {e}")
+            return ""
+
+    translated = "\n\n".join(p for p in out_parts if p).strip()
+    print(f"  [Sarvam TL] ✅ Translated {len(text)} → {len(translated)} chars ({target})")
+    return translated
+
+
 async def translate_transcript(text: str, target_lang: str) -> str:
-    """Translate transcript text to target language."""
+    """Translate transcript text. Indian languages go through Sarvam AI;
+    all other languages use Gemini."""
+    if not text or not target_lang or target_lang == "same":
+        return text or ""
+
+    if target_lang in INDIAN_LANGS:
+        sarvam_out = await translate_sarvam(text, target_lang)
+        if sarvam_out:
+            return sarvam_out
+        print("  [Translate] ⚠️ Sarvam failed — falling back to Gemini")
+
     lang_name = LANG_NAMES.get(target_lang, target_lang)
     system = (
         f"You are a professional translator. Translate the given text to {lang_name}. "
