@@ -131,8 +131,12 @@ async def refresh_zoom_token(refresh_token: str) -> dict[str, Any]:
 
 
 async def get_zoom_meetings(access_token: str) -> list[dict]:
-    """Fetch upcoming Zoom meetings."""
+    """Fetch upcoming Zoom meetings and recent past meetings (with recordings)."""
+    meetings: list[dict] = []
+    seen_ids: set[str] = set()
+
     async with httpx.AsyncClient() as client:
+        # Upcoming scheduled meetings
         res = await client.get(
             f"{ZOOM_API_BASE}/users/me/meetings",
             headers={"Authorization": f"Bearer {access_token}"},
@@ -142,19 +146,55 @@ async def get_zoom_meetings(access_token: str) -> list[dict]:
         if res.status_code == 401:
             raise PermissionError("Zoom token expired")
         res.raise_for_status()
-        data = res.json()
+        for m in res.json().get("meetings", []):
+            mid = str(m.get("id"))
+            if mid in seen_ids:
+                continue
+            seen_ids.add(mid)
+            meetings.append({
+                "id": mid,
+                "title": m.get("topic", "Zoom Meeting"),
+                "start_time": m.get("start_time", ""),
+                "duration": m.get("duration", 0),
+                "join_url": m.get("join_url", ""),
+                "platform": "zoom",
+                "status": "scheduled",
+            })
 
-    meetings = []
-    for m in data.get("meetings", []):
-        meetings.append({
-            "id": str(m.get("id")),
-            "title": m.get("topic", "Zoom Meeting"),
-            "start_time": m.get("start_time", ""),
-            "duration": m.get("duration", 0),
-            "join_url": m.get("join_url", ""),
-            "platform": "zoom",
-            "status": "scheduled",
-        })
+        # Recent past meetings that have cloud recordings (last 7 days)
+        to_date = datetime.now(timezone.utc).date()
+        from_date = to_date - timedelta(days=7)
+        try:
+            rec_res = await client.get(
+                f"{ZOOM_API_BASE}/users/me/recordings",
+                headers={"Authorization": f"Bearer {access_token}"},
+                params={
+                    "from": from_date.isoformat(),
+                    "to": to_date.isoformat(),
+                    "page_size": 30,
+                },
+                timeout=15.0,
+            )
+            if rec_res.status_code == 200:
+                for m in rec_res.json().get("meetings", []):
+                    mid = str(m.get("id"))
+                    if mid in seen_ids:
+                        continue
+                    seen_ids.add(mid)
+                    meetings.append({
+                        "id": mid,
+                        "title": m.get("topic", "Zoom Meeting"),
+                        "start_time": m.get("start_time", ""),
+                        "end_time": "",
+                        "duration": m.get("duration", 0),
+                        "join_url": "",
+                        "platform": "zoom",
+                        "status": "recorded",
+                        "has_recording": True,
+                    })
+        except httpx.HTTPError:
+            pass
+
     return meetings
 
 
@@ -269,10 +309,14 @@ async def refresh_google_token(refresh_token: str) -> dict[str, Any]:
         return res.json()
 
 
-async def get_google_calendar_meetings(access_token: str, days_ahead: int = 7) -> list[dict]:
-    """Fetch upcoming meetings from Google Calendar."""
+async def get_google_calendar_meetings(
+    access_token: str,
+    days_ahead: int = 7,
+    days_back: int = 7,
+) -> list[dict]:
+    """Fetch recent + upcoming meetings from Google Calendar."""
     now = datetime.now(timezone.utc)
-    time_min = now.isoformat()
+    time_min = (now - timedelta(days=days_back)).isoformat()
     time_max = (now + timedelta(days=days_ahead)).isoformat()
 
     async with httpx.AsyncClient() as client:
@@ -403,9 +447,9 @@ async def refresh_webex_token(refresh_token: str) -> dict[str, Any]:
 
 
 async def get_webex_meetings(access_token: str) -> list[dict]:
-    """Fetch upcoming Webex meetings."""
+    """Fetch recent + upcoming Webex meetings."""
     now = datetime.now(timezone.utc)
-    from_time = now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    from_time = (now - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
     to_time = (now + timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
     async with httpx.AsyncClient() as client:

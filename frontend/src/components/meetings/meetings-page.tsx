@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   ChevronRight,
   ExternalLink,
+  Info,
   LinkIcon,
   LoaderCircle,
   LogOut,
@@ -99,6 +100,7 @@ export function MeetingsPageClient() {
   const [transcribing, setTranscribing] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [providerErrors, setProviderErrors] = useState<Record<string, string>>({});
 
   /* ── Fetch integration status ── */
   const fetchStatus = useCallback(async () => {
@@ -121,17 +123,16 @@ export function MeetingsPageClient() {
     try {
       const res = await fetch("/api/proxy/meetings/all");
       const data = await readJson(res);
-      if (data.meetings) {
-        // Filter out past events — only show upcoming
-        const now = new Date();
-        const upcoming = (data.meetings as Meeting[]).filter((m) => {
-          const end = m.end_time ? new Date(m.end_time) : m.start_time ? new Date(m.start_time) : null;
-          return end ? end >= now : true;
-        });
-        setMeetings(upcoming);
+      if (data.error && !data.meetings) {
+        setError(data.error);
+        setMeetings([]);
+        setProviderErrors({});
+      } else {
+        setMeetings((data.meetings as Meeting[]) || []);
+        setProviderErrors((data.errors as Record<string, string>) || {});
       }
     } catch {
-      // Non-critical — status already shown
+      setError("Failed to load meetings from connected platforms");
     } finally {
       setRefreshing(false);
     }
@@ -249,6 +250,24 @@ export function MeetingsPageClient() {
       </div>
     );
   }
+
+  const now = new Date();
+  const meetingEnd = (m: Meeting) => {
+    const t = m.end_time || m.start_time;
+    return t ? new Date(t) : null;
+  };
+  const upcomingMeetings = meetings.filter((m) => {
+    const end = meetingEnd(m);
+    return !end || end >= now;
+  });
+  const pastMeetings = meetings
+    .filter((m) => {
+      const end = meetingEnd(m);
+      return end && end < now;
+    })
+    .sort((a, b) => (b.start_time || "").localeCompare(a.start_time || ""));
+
+  const anyConnected = Object.values(status || {}).some((s) => s?.connected);
 
   const platforms: { key: Platform; label: string; icon: string; description: string }[] = [
     {
@@ -393,7 +412,57 @@ export function MeetingsPageClient() {
         })}
       </div>
 
-      {/* Upcoming Meetings */}
+      {/* Onboarding guidance */}
+      {anyConnected && (
+        <div
+          className="flex items-start gap-3 rounded-xl px-4 py-3 text-xs"
+          style={{
+            background: "rgba(59,130,246,0.08)",
+            border: "1px solid rgba(59,130,246,0.22)",
+            color: "rgba(191,219,254,0.9)",
+          }}
+        >
+          <Info className="mt-0.5 h-4 w-4 shrink-0" />
+          <div className="space-y-1">
+            <div className="font-semibold text-white/80">How to get a transcript</div>
+            <div className="leading-relaxed">
+              Transcription pulls from the host&apos;s cloud recording after the meeting ends. For
+              Zoom, Cloud Recording must be enabled (Zoom Pro or higher). For Webex, recording
+              must be turned on during the meeting. Once the meeting is over and the recording
+              is processed, it appears below with a <span className="font-semibold">Get Transcript</span> button.
+              Free-tier users can also{" "}
+              <a href="/studio" className="underline hover:text-white">
+                upload an audio file in Studio
+              </a>{" "}
+              instead.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Per-provider fetch errors */}
+      {Object.keys(providerErrors).length > 0 && (
+        <div
+          className="rounded-xl px-4 py-3 text-xs space-y-1"
+          style={{
+            background: "rgba(234,179,8,0.08)",
+            border: "1px solid rgba(234,179,8,0.22)",
+            color: "#fde68a",
+          }}
+        >
+          <div className="flex items-center gap-2 font-semibold text-white/80">
+            <XCircle className="h-4 w-4" />
+            Some meetings could not be loaded
+          </div>
+          {Object.entries(providerErrors).map(([p, msg]) => (
+            <div key={p} className="opacity-80">
+              <span className="font-medium">{platformLabel(p)}:</span> {msg}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Meetings list */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
@@ -411,7 +480,7 @@ export function MeetingsPageClient() {
           </button>
         </div>
 
-        {meetings.length === 0 ? (
+        {upcomingMeetings.length === 0 ? (
           <div
             className="rounded-2xl p-12 text-center"
             style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
@@ -421,84 +490,128 @@ export function MeetingsPageClient() {
               No upcoming meetings
             </p>
             <p className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.25)" }}>
-              Connect a platform above to see your meetings here
+              {anyConnected
+                ? "Schedule a meeting in your calendar to see it here"
+                : "Connect a platform above to see your meetings here"}
             </p>
           </div>
         ) : (
           <div className="space-y-2">
-            {meetings.map((m) => (
-              <div
+            {upcomingMeetings.map((m) => (
+              <MeetingRow
                 key={`${m.platform}-${m.id}`}
-                className="group flex items-center gap-4 rounded-xl px-4 py-3 transition-all hover:bg-white/[0.03]"
-                style={{ border: "1px solid rgba(255,255,255,0.06)" }}
-              >
-                {/* Platform badge */}
-                <div
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
-                  style={{ background: `${platformColor(m.platform)}15`, color: platformColor(m.platform) }}
-                >
-                  <Video className="h-4 w-4" />
-                </div>
-
-                {/* Meeting info */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium text-white">{m.title}</span>
-                    <span
-                      className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase"
-                      style={{ background: `${platformColor(m.platform)}15`, color: platformColor(m.platform) }}
-                    >
-                      {platformLabel(m.platform)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 mt-0.5">
-                    <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
-                      {formatTime(m.start_time)}
-                    </span>
-                    {m.duration ? (
-                      <span className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>
-                        {m.duration} min
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-2 shrink-0">
-                  {m.join_url && (
-                    <a
-                      href={m.join_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-all hover:bg-white/5"
-                      style={{ color: platformColor(m.platform) }}
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                      Join
-                    </a>
-                  )}
-                  {(m.platform === "zoom" || m.platform === "webex") && (
-                    <button
-                      onClick={() => transcribeMeeting(m)}
-                      disabled={transcribing === m.id}
-                      className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-all hover:bg-violet-500/10"
-                      style={{ color: "#a78bfa", border: "1px solid rgba(124,58,237,0.2)" }}
-                    >
-                      {transcribing === m.id ? (
-                        <LoaderCircle className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <ChevronRight className="h-3 w-3" />
-                      )}
-                      {transcribing === m.id ? "Transcribing..." : "Get Transcript"}
-                    </button>
-                  )}
-                </div>
-              </div>
+                m={m}
+                transcribing={transcribing === m.id}
+                onTranscribe={() => transcribeMeeting(m)}
+              />
             ))}
           </div>
         )}
       </div>
 
+      {/* Recent past meetings */}
+      {pastMeetings.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+            <Calendar className="h-5 w-5 text-white/40" />
+            Recent Meetings (last 7 days)
+          </h2>
+          <div className="space-y-2">
+            {pastMeetings.map((m) => (
+              <MeetingRow
+                key={`${m.platform}-${m.id}`}
+                m={m}
+                transcribing={transcribing === m.id}
+                onTranscribe={() => transcribeMeeting(m)}
+                past
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+/* ── Meeting row ─────────────────────────────────── */
+function MeetingRow({
+  m,
+  transcribing,
+  onTranscribe,
+  past = false,
+}: {
+  m: Meeting;
+  transcribing: boolean;
+  onTranscribe: () => void;
+  past?: boolean;
+}) {
+  return (
+    <div
+      className="group flex items-center gap-4 rounded-xl px-4 py-3 transition-all hover:bg-white/[0.03]"
+      style={{
+        border: "1px solid rgba(255,255,255,0.06)",
+        opacity: past ? 0.75 : 1,
+      }}
+    >
+      <div
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
+        style={{ background: `${platformColor(m.platform)}15`, color: platformColor(m.platform) }}
+      >
+        <Video className="h-4 w-4" />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium text-white">{m.title}</span>
+          <span
+            className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase"
+            style={{ background: `${platformColor(m.platform)}15`, color: platformColor(m.platform) }}
+          >
+            {platformLabel(m.platform)}
+          </span>
+        </div>
+        <div className="flex items-center gap-3 mt-0.5">
+          <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
+            {formatTime(m.start_time)}
+          </span>
+          {m.duration ? (
+            <span className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>
+              {m.duration} min
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 shrink-0">
+        {!past && m.join_url && (
+          <a
+            href={m.join_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-all hover:bg-white/5"
+            style={{ color: platformColor(m.platform) }}
+          >
+            <ExternalLink className="h-3 w-3" />
+            Join
+          </a>
+        )}
+        {(m.platform === "zoom" || m.platform === "webex") && (
+          <button
+            onClick={onTranscribe}
+            disabled={transcribing}
+            className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-all hover:bg-violet-500/10"
+            style={{ color: "#a78bfa", border: "1px solid rgba(124,58,237,0.2)" }}
+          >
+            {transcribing ? (
+              <LoaderCircle className="h-3 w-3 animate-spin" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+            {transcribing ? "Transcribing..." : "Get Transcript"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
